@@ -1,0 +1,10 @@
+idf_component_register(SRCS 
+                        "main.cpp" 
+                        "encoder_model.cc"
+                       INCLUDE_DIRS 
+                        ""
+                        #"../components/tflite-micro" 
+                        "../components/esp32-camera"
+                       REQUIRES 
+                        esp_wifi esp_netif esp_event nvs_flash esp32-camera mqtt tflite-micro
+                       EMBED_FILES encoder_model.tflite)
