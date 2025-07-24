@@ -107,4 +107,5 @@ void start_mqtt_client(int pd,float score) {
              "{\"class\":\"%s\", \"confidence\":%.3f}",
              class_names[pd], score);
     mqtt_send_result(mqtt_client, json);
+    //ESP_LOGI(TAG," tensor OK %s\r\n",json);
 }

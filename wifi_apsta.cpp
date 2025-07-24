@@ -66,7 +66,42 @@ TaskHandle_t tensor_task_handle = NULL;
 float min_dist = INFINITY;
         int pred = -1; 
 //void tensor_task(void)
-static void tensor_task(void *arg)
+float g_buffer[MODEL_INPUT_SIZE*MODEL_INPUT_SIZE];
+static void tensor_prework(void)
+{
+     
+    const int src_w = fb->width;
+    const int src_h = fb->height;
+    const uint8_t* src = fb->buf; 
+
+    
+    for (int y = 0; y < MODEL_INPUT_SIZE; ++y) {
+        for (int x = 0; x < MODEL_INPUT_SIZE; ++x) {
+            // 最近邻采样：将 160x120 → 64x64
+            int src_x = x * src_w / MODEL_INPUT_SIZE;
+            int src_y = y * src_h / MODEL_INPUT_SIZE;
+            int index = (src_y * src_w + src_x) * 2; // 每像素2字节(RGB565)
+
+            // 提取 RGB565 中的灰度近似
+            uint8_t byte1 = src[index];
+            uint8_t byte2 = src[index + 1];
+
+            // 解码 RGB565 → 灰度
+            uint8_t r = (byte2 & 0xF8);
+            uint8_t g = ((byte2 & 0x07) << 5) | ((byte1 & 0xE0) >> 3);
+            uint8_t b = (byte1 & 0x1F) << 3;
+            uint8_t gray = (r * 30 + g * 59 + b * 11) / 100;
+
+            // 写入模型输入张量
+            int input_index = y * MODEL_INPUT_SIZE + x;
+            g_buffer[input_index]  = gray / 255.0f;  // 归一化为 float32
+        }
+    }  
+    
+}
+
+
+static void tensor_task(void)
 {
     
     const tflite::Model* model = tflite::GetModel(encoder_model_float);
@@ -92,45 +127,22 @@ static void tensor_task(void *arg)
         
     TfLiteTensor* input = interpreter.input(0);
     if (input == nullptr) {
-        ESP_LOGE(TAG, "Input tensor is null!");
-        vTaskDelete(NULL);
+        //ESP_LOGE(TAG, "Input tensor is null!");
+        //vTaskDelete(NULL);
         return  ;
     }
 
     TfLiteTensor*  output = interpreter.output(0);
     if (output == nullptr) {
-        ESP_LOGE(TAG, "Output tensor is null!");
-        vTaskDelete(NULL);
+        //ESP_LOGE(TAG, "Output tensor is null!");
+        //vTaskDelete(NULL);
         return  ;
     } 
-
-    
-    const int src_w = fb->width;
-    const int src_h = fb->height;
-    const uint8_t* src = fb->buf; 
+ 
 
     float* input_buffer = (float*)(input->data.f);
-    for (int y = 0; y < MODEL_INPUT_SIZE; ++y) {
-        for (int x = 0; x < MODEL_INPUT_SIZE; ++x) {
-            // 最近邻采样：将 160x120 → 64x64
-            int src_x = x * src_w / MODEL_INPUT_SIZE;
-            int src_y = y * src_h / MODEL_INPUT_SIZE;
-            int index = (src_y * src_w + src_x) * 2; // 每像素2字节(RGB565)
-
-            // 提取 RGB565 中的灰度近似
-            uint8_t byte1 = src[index];
-            uint8_t byte2 = src[index + 1];
-
-            // 解码 RGB565 → 灰度
-            uint8_t r = (byte2 & 0xF8);
-            uint8_t g = ((byte2 & 0x07) << 5) | ((byte1 & 0xE0) >> 3);
-            uint8_t b = (byte1 & 0x1F) << 3;
-            uint8_t gray = (r * 30 + g * 59 + b * 11) / 100;
-
-            // 写入模型输入张量
-            int input_index = y * MODEL_INPUT_SIZE + x;
-            input_buffer[input_index]  = gray / 255.0f;  // 归一化为 float32
-        }
+    for (int y = 0; y < MODEL_INPUT_SIZE*MODEL_INPUT_SIZE; ++y) {  
+            input_buffer[y]  = g_buffer[y];    
     }  
     interpreter.Invoke();
         float* feat = (float*)output->data.f ;
@@ -149,8 +161,9 @@ static void tensor_task(void *arg)
             }
         }
         
-        start_mqtt_client(pred,min_dist);
-        vTaskDelete(NULL);
+        //start_mqtt_client(pred,min_dist);
+       
+        //vTaskDelete(NULL);
 }
 
 
@@ -169,6 +182,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                 break;
             case WIFI_EVENT_AP_STACONNECTED:
                 ESP_LOGI(TAG, "Device connected to AP");
+               
                 break;
             case WIFI_EVENT_AP_STADISCONNECTED:
                 ESP_LOGI(TAG, "Device disconnected from AP");
@@ -203,11 +217,15 @@ void fb_gfx_fillRect(fb_data_t *fb, int32_t x, int32_t y, int32_t w, int32_t h, 
 httpd_handle_t server = NULL;
 
 httpd_handle_t start_webserver() {
+   
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     if(ESP_OK != httpd_start(&server, &config))
         ESP_LOGE(TAG, "httpd_start failed");
-    if(ESP_OK != httpd_register_uri_handler(server, &stream_uri))
-        ESP_LOGE(TAG, "httpd_register_uri_handler failed");
+    if(ESP_OK != httpd_register_uri_handler(server, &stream_uri)){  
+            ESP_LOGE(TAG, "httpd_register_uri_handler failed"); 
+    }
+    
+    
     ESP_LOGI("MAIN", "Server ready at http://192.168.4.1/stream");
     //ESP_LOGI("MAIN", "Server ready at http://192.168.0.57/stream");
     
@@ -349,11 +367,13 @@ static esp_err_t stream_handler(httpd_req_t *req)
                     
                    // xTaskCreate(tensor_task, "tensor_task", 8192, NULL, 5, &tensor_task_handle);
                    //   xTaskCreate(tensor_task, "tensor_task", 8192, NULL, 5, NULL);
-     
-                    tensor_state=(tensor_state+1)%100;
-                    res = ESP_FAIL;
-                    xTaskCreate(tensor_task, "tensor_task", 8192, NULL, 5, NULL);
-            
+                    tensor_prework();
+                    tensor_state=1;//(tensor_state+1)%100;
+                    ESP_LOGI(TAG, "tensor_prework %d",tensor_state);
+                    //res = ESP_FAIL;
+                    //xTaskCreate(restart_task, "restart_task", 4096, NULL, 5, NULL);
+                    
+                    //return ESP_FAIL;
                     // if(pred>=0){
                     //     fb_data_t fb_data; 
                     //     fb_data.width = fb->width;
@@ -372,7 +392,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
                     // }
                       
                 }
-                //   vTaskDelay(300000 / portTICK_PERIOD_MS); 
+                //  
  
             }            
         }
@@ -401,10 +421,13 @@ static esp_err_t stream_handler(httpd_req_t *req)
 
                 if (res != ESP_OK)
                 {
-                    xTaskCreate(restart_task, "restart_task", 4096, NULL, 5, NULL);
+                    //xTaskCreate(restart_task, "restart_task", 4096, NULL, 5, NULL);
+                    
                     return ESP_FAIL;
                 }
             }
+         
+            
         }
         vTaskDelay(pdMS_TO_TICKS(20));
     }
@@ -426,8 +449,22 @@ extern "C" void  app_main(void) {
         ESP_LOGE(TAG, "连接失败！");
     }
 init_camera();
-    start_webserver(); 
+    //start_webserver(); 
+    //
     // xTaskCreate(tensor_task, "tensor_task", 8192, NULL, 5, NULL);
-                    
+    while(true)
+    {
+        if(tensor_state ==0)
+           xTaskCreate(restart_task, "restart_task", 4096, NULL, 5, NULL);
+        if(tensor_state ==1){
+            
+            ESP_LOGI(TAG, "tensor_task start");
+            //xTaskCreate(tensor_task, "tensor_task", 8192, NULL, 5, NULL); 
+            tensor_task(); 
+            tensor_state=0;
+            // vTaskDelete(NULL);
+        }
+         vTaskDelay(30000 / portTICK_PERIOD_MS); 
+    }
     // 你可以添加更多任务：如启动 HTTP 服务器等
 }
