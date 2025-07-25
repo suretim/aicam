@@ -170,12 +170,7 @@ static void tensor_task(void *arg)
     for (int j = 0; j < num_features; ++j) {
         feat_out[j] = output->data.f[j] ;
     }
-
-   // for (int j = 0; j < output->dims->data[0]; ++j) {
-   //     feat_out[j] =output->data.f[j]+0.1;
-   //     }
-    
-    //start_mqtt_client(pred,min_dist);
+ 
      tensor_state =5;  // 处理完成，通知主任务可继续
     
      ESP_LOGI(TAG, "Class Done tensor_state=%d",tensor_state);    
@@ -450,6 +445,21 @@ static esp_err_t stream_handler(httpd_req_t *req)
     return res;
 }
 
+void mqtt_task(void *param) {
+    //esp_task_wdt_add(NULL);
+    //while(true)
+    //{
+        
+            ESP_LOGI(TAG, "start_mqtt_client start %d",tensor_state);
+            start_mqtt_client(feat_out );
+            tensor_state=0;
+         
+        //esp_task_wdt_reset();
+        vTaskDelay(pdMS_TO_TICKS(10));
+    //}
+     
+    vTaskDelete(NULL);    // 结束任务
+}
 void  main_task(void *arg) {  
     esp_task_wdt_add(NULL);
     
@@ -480,15 +490,13 @@ void  main_task(void *arg) {
         if(tensor_state ==3){
             tensor_state = 4;  // 表示"正在运行"，避免重复启动
              ESP_LOGI(TAG, "tensor_task start %d",tensor_state);
-            xTaskCreate(tensor_task, "tensor_task", 8192, NULL, 5, NULL); //  异步运行
+            xTaskCreate(tensor_task, "tensor_task", 8192, NULL,6, NULL); //  异步运行
              
              
         }
         if(tensor_state==5)
         {
-             ESP_LOGI(TAG, "start_mqtt_client start %d",tensor_state);
-            start_mqtt_client(feat_out );
-            tensor_state=0;
+            xTaskCreate(mqtt_task, "mqtt_task", 4096, NULL, 5, NULL);
         }
         esp_task_wdt_reset(); 
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -510,6 +518,7 @@ void init_task_watchdog_once()
         ESP_ERROR_CHECK(err);
     }
 }
+ 
 extern "C" void app_main() {
      wifi_init_apsta();
 
@@ -527,5 +536,6 @@ extern "C" void app_main() {
     init_camera();
     xTaskCreate(start_webserver, "start_webserver", 4096, NULL, 5, NULL);
     init_task_watchdog_once(); 
-        xTaskCreate(main_task, "main_task", 4096, NULL, 5, NULL);
+    xTaskCreate(main_task, "main_task", 4096, NULL, 5, NULL);
+     
 }
