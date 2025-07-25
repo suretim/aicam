@@ -32,6 +32,7 @@
 #include "class_prototypes.h"
 #include "mqtt_upload.h"
 #include "camera_config.h"
+#include <esp_task_wdt.h>
 #define MODEL_INPUT_SIZE 64
 
 #define WIFI_SSID_STA      "1573"
@@ -62,19 +63,27 @@ httpd_uri_t stream_uri = {
     .handler = stream_handler
 };
 TaskHandle_t tensor_task_handle = NULL;
-
-float min_dist = INFINITY;
-        int pred = -1; 
+float  feat_out[NUM_BATCH*EMBEDDING_DIM ];
+// float min_dist = INFINITY;
+//         int pred = -1; 
 //void tensor_task(void)
 float g_buffer[MODEL_INPUT_SIZE*MODEL_INPUT_SIZE];
 static void tensor_prework(void)
 {
-     
+     if (fb == NULL) {
+        ESP_LOGE(TAG, "Frame buffer pointer is NULL!");
+        return; // 直接返回，避免崩溃
+    }
+
     const int src_w = fb->width;
     const int src_h = fb->height;
-    const uint8_t* src = fb->buf; 
+    const uint8_t* src = fb->buf;
 
-    
+    if (src == NULL) {
+        ESP_LOGE(TAG, "Frame buffer data is NULL!");
+        return;
+    }
+     
     for (int y = 0; y < MODEL_INPUT_SIZE; ++y) {
         for (int x = 0; x < MODEL_INPUT_SIZE; ++x) {
             // 最近邻采样：将 160x120 → 64x64
@@ -101,9 +110,10 @@ static void tensor_prework(void)
 }
 
 
-static void tensor_task(void)
+static void tensor_task(void *arg)
 {
-    
+    esp_task_wdt_add(NULL);  // 注册到 watchdog
+  //vTaskDelay(50 / portTICK_PERIOD_MS);  // 延迟50ms
     const tflite::Model* model = tflite::GetModel(encoder_model_float);
     //const tflite::Model* model = reinterpret_cast<const tflite::Model*>(encoder_model);
     
@@ -127,15 +137,15 @@ static void tensor_task(void)
         
     TfLiteTensor* input = interpreter.input(0);
     if (input == nullptr) {
-        //ESP_LOGE(TAG, "Input tensor is null!");
-        //vTaskDelete(NULL);
+        ESP_LOGE(TAG, "Input tensor is null!");
+        vTaskDelete(NULL);
         return  ;
     }
 
     TfLiteTensor*  output = interpreter.output(0);
     if (output == nullptr) {
-        //ESP_LOGE(TAG, "Output tensor is null!");
-        //vTaskDelete(NULL);
+        ESP_LOGE(TAG, "Output tensor is null!");
+        vTaskDelete(NULL);
         return  ;
     } 
  
@@ -144,26 +154,36 @@ static void tensor_task(void)
     for (int y = 0; y < MODEL_INPUT_SIZE*MODEL_INPUT_SIZE; ++y) {  
             input_buffer[y]  = g_buffer[y];    
     }  
+    esp_task_wdt_reset(); 
     interpreter.Invoke();
-        float* feat = (float*)output->data.f ;
+    esp_task_wdt_reset(); 
+    ESP_LOGI(TAG, "Inference Done tensor_state=%d",tensor_state);    
+      
+    // = (float*)output->data.f ;
+    for (int j = 0; j < output->dims->size; ++j) {
+        printf("Dimension %d: %d\r\n", j, output->dims->data[j]);
+    }
+    int num_features = 1;
+    for (int i = 0; i < output->dims->size; ++i) {
+        num_features *= output->dims->data[i];
+    }
+    for (int j = 0; j < num_features; ++j) {
+        feat_out[j] = output->data.f[j] ;
+    }
 
-          min_dist = INFINITY;
-          pred = -1;
-        for (int c = 0; c < NUM_CLASSES; ++c) {
-            float dist = 0.0f;
-            for (int j = 0; j < EMBEDDING_DIM; ++j) {
-                float diff = feat[j] - class_prototypes[c][j];
-                dist += diff * diff;
-            }
-            if (dist < min_dist) {
-                min_dist = dist;
-                pred = c;
-            }
-        }
-        
-        //start_mqtt_client(pred,min_dist);
-       
-        //vTaskDelete(NULL);
+   // for (int j = 0; j < output->dims->data[0]; ++j) {
+   //     feat_out[j] =output->data.f[j]+0.1;
+   //     }
+    
+    //start_mqtt_client(pred,min_dist);
+     tensor_state =5;  // 处理完成，通知主任务可继续
+    
+     ESP_LOGI(TAG, "Class Done tensor_state=%d",tensor_state);    
+     
+    heap_caps_free(tensor_arena);
+    esp_task_wdt_delete(NULL);  // 可选：退出前注销 watchdog
+    vTaskDelete(NULL);  // 删除自己
+    
 }
 
 
@@ -216,38 +236,29 @@ void fb_gfx_fillRect(fb_data_t *fb, int32_t x, int32_t y, int32_t w, int32_t h, 
 
 httpd_handle_t server = NULL;
 
-httpd_handle_t start_webserver() {
-   
-    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    if(ESP_OK != httpd_start(&server, &config))
-        ESP_LOGE(TAG, "httpd_start failed");
-    if(ESP_OK != httpd_register_uri_handler(server, &stream_uri)){  
-            ESP_LOGE(TAG, "httpd_register_uri_handler failed"); 
-    }
-    
-    
-    ESP_LOGI("MAIN", "Server ready at http://192.168.4.1/stream");
-    //ESP_LOGI("MAIN", "Server ready at http://192.168.0.57/stream");
-    
-    return server;
-}
-
-void stop_webserver() {
+static void start_webserver(void *arg ) {
     if (server) {
         httpd_stop(server); // 阻塞式停止，确保所有连接关闭
         server = NULL;
         ESP_LOGI(TAG, "HTTP server stopped");
         vTaskDelay(500 / portTICK_PERIOD_MS); // 等待资源释放
     }
-}
-
-static void restart_task(void *arg) {
-   
-    stop_webserver();
-    start_webserver();
+    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    if(ESP_OK != httpd_start(&server, &config))
+        ESP_LOGE(TAG, "httpd_start failed");
+    
+    
+    if(ESP_OK != httpd_register_uri_handler(server, &stream_uri)){  
+            ESP_LOGE(TAG, "httpd_register_uri_handler failed"); 
+    }  
+    ESP_LOGI("MAIN", "Server ready at http://192.168.4.1/stream");
+    //ESP_LOGI("MAIN", "Server ready at http://192.168.0.57/stream");
+    
     vTaskDelete(NULL);
+    return  ;
 }
-
+  
+ 
 
 
 void fb_gfx_drawFastHLine(fb_data_t *fb, int32_t x, int32_t y, int32_t w, uint32_t color)
@@ -340,40 +351,38 @@ static esp_err_t stream_handler(httpd_req_t *req)
     while (true)
     {
         //获取指向帧缓冲区的指针
-        fb = esp_camera_fb_get();
+        
+        //fb = esp_camera_fb_get();
         if (!fb)
         {
             ESP_LOGE(TAG, "Camera capture failed");
-            res = ESP_FAIL;
+            //res = ESP_FAIL;
             httpd_resp_send_500(req);
+            vTaskDelay(pdMS_TO_TICKS(10));
              return ESP_FAIL; 
         }
-                
-        res = ESP_OK;
+        if(tensor_state!=1){
+            vTaskDelay(pdMS_TO_TICKS(100));
+           continue;     
+        }
+        //res = ESP_OK;
         uint8_t *rgb888_buf =(uint8_t *) heap_caps_malloc(fb->width * fb->height * 3, MALLOC_CAP_SPIRAM);
-        if(rgb888_buf != NULL)
+        if(rgb888_buf == NULL){
+            return ESP_FAIL; 
+        }
+        if(fmt2rgb888(fb->buf, fb->len, fb->format, rgb888_buf) != true)
         {
-            if(fmt2rgb888(fb->buf, fb->len, fb->format, rgb888_buf) != true)
-            {
-                ESP_LOGE(TAG, "fmt2rgb888 failed, fb: %d", fb->len);
-                esp_camera_fb_return(fb);
-                free(rgb888_buf);
-                res = ESP_FAIL;
-            }
-            else
-            { 
+            ESP_LOGE(TAG, "fmt2rgb888 failed, fb: %d", fb->len);
+            //esp_camera_fb_return(fb);
+            free(rgb888_buf);
+            vTaskDelay(pdMS_TO_TICKS(10));
+            //res = ESP_FAIL;
+            return ESP_FAIL;
+        }
+            //else
+            //{ 
          
-                if( tensor_state==0){
-                    
-                   // xTaskCreate(tensor_task, "tensor_task", 8192, NULL, 5, &tensor_task_handle);
-                   //   xTaskCreate(tensor_task, "tensor_task", 8192, NULL, 5, NULL);
-                    tensor_prework();
-                    tensor_state=1;//(tensor_state+1)%100;
-                    ESP_LOGI(TAG, "tensor_prework %d",tensor_state);
-                    //res = ESP_FAIL;
-                    //xTaskCreate(restart_task, "restart_task", 4096, NULL, 5, NULL);
-                    
-                    //return ESP_FAIL;
+                 
                     // if(pred>=0){
                     //     fb_data_t fb_data; 
                     //     fb_data.width = fb->width;
@@ -391,51 +400,118 @@ static esp_err_t stream_handler(httpd_req_t *req)
                     //     fb_gfx_drawFastVLine(&fb_data, x + w - 1, y, h, color);
                     // }
                       
-                }
-                //  
- 
-            }            
-        }
-
-        if(res == ESP_OK)
-        {
-           
-             _jpg_buf = NULL;
-            bool jpeg_converted = fmt2jpg(rgb888_buf, fb->width * fb->height * 3, fb->width, fb->height, PIXFORMAT_RGB888, 90,  &_jpg_buf, &_jpg_buf_len);
-            esp_camera_fb_return(fb);
-            free(rgb888_buf);
-            if (!jpeg_converted) {
-                ESP_LOGE(TAG, "JPEG compression failed");
-                if (_jpg_buf) free(_jpg_buf);
-            }
-            else {
                 
-                size_t len = snprintf(part_buf, 64,
-                    "\r\n--frame\r\nContent-Type: image/jpeg\r\n\r\n");
-                res = httpd_resp_send_chunk(req, part_buf, len);
-                if(res == ESP_OK) {
-                    
-                    res = httpd_resp_send_chunk(req, (const char *)_jpg_buf, _jpg_buf_len);
-                }
-                if (_jpg_buf) free(_jpg_buf);
+ 
+        //    }            
+        //}
 
-                if (res != ESP_OK)
-                {
-                    //xTaskCreate(restart_task, "restart_task", 4096, NULL, 5, NULL);
-                    
+        //if(res == ESP_OK)
+        //{
+           
+                _jpg_buf = NULL;
+                bool jpeg_converted = fmt2jpg(rgb888_buf, fb->width * fb->height * 3, fb->width, fb->height, PIXFORMAT_RGB888, 90,  &_jpg_buf, &_jpg_buf_len);
+                //esp_camera_fb_return(fb);
+                free(rgb888_buf);
+                if (!jpeg_converted) {
+                    ESP_LOGE(TAG, "JPEG compression failed");
+                    if (_jpg_buf) 
+                        free(_jpg_buf);
+                    vTaskDelay(pdMS_TO_TICKS(10));
                     return ESP_FAIL;
                 }
-            }
+                //else {
+                    
+                    size_t len = snprintf(part_buf, 64,
+                        "\r\n--frame\r\nContent-Type: image/jpeg\r\n\r\n");
+                    res = httpd_resp_send_chunk(req, part_buf, len);
+                    if(res == ESP_OK) {
+                        
+                        res = httpd_resp_send_chunk(req, (const char *)_jpg_buf, _jpg_buf_len);
+                    }
+                    if (_jpg_buf) free(_jpg_buf);
+
+                    //if (res != ESP_OK)
+                    //{
+                        //xTaskCreate(start_webserver, "start_webserver", 4096, NULL, 5, NULL);
+                    //    vTaskDelay(pdMS_TO_TICKS(10));
+                    //    return ESP_FAIL;
+                    //}
+                //}
+                //if( tensor_state==0){  
+                    //tensor_prework();
+                //    tensor_state=1;//(tensor_state+1)%100;
+                    //ESP_LOGI(TAG, "tensor_prework %d",tensor_state); 
+                //}
+            //}
+            tensor_state=2;
+            vTaskDelay(pdMS_TO_TICKS(10));
          
-            
-        }
-        vTaskDelay(pdMS_TO_TICKS(20));
     }
     return res;
 }
 
-extern "C" void  app_main(void) {
-    wifi_init_apsta();
+void  main_task(void *arg) {  
+    esp_task_wdt_add(NULL);
+    
+    while(true)
+    {
+         
+        
+            
+        if( tensor_state==0){
+             fb = esp_camera_fb_get();
+            if (!fb)
+            {
+                ESP_LOGE(TAG, "Camera capture failed");
+                
+                //httpd_resp_send_500(req);
+                vTaskDelay(pdMS_TO_TICKS(100));
+                continue;
+                // return ESP_FAIL; 
+            }
+            tensor_state=1;
+        }
+        if( tensor_state==2){        
+             tensor_prework();
+            tensor_state=3; 
+            ESP_LOGI(TAG, "tensor_prework %d",tensor_state);
+            esp_camera_fb_return(fb);
+        }
+        if(tensor_state ==3){
+            tensor_state = 4;  // 表示"正在运行"，避免重复启动
+             ESP_LOGI(TAG, "tensor_task start %d",tensor_state);
+            xTaskCreate(tensor_task, "tensor_task", 8192, NULL, 5, NULL); //  异步运行
+             
+             
+        }
+        if(tensor_state==5)
+        {
+             ESP_LOGI(TAG, "start_mqtt_client start %d",tensor_state);
+            start_mqtt_client(feat_out );
+            tensor_state=0;
+        }
+        esp_task_wdt_reset(); 
+        vTaskDelay(pdMS_TO_TICKS(10));
+        // vTaskDelay(30000 / portTICK_PERIOD_MS); 
+    } 
+} 
+void init_task_watchdog_once()
+{
+    const esp_task_wdt_config_t twdt_config = {
+        .timeout_ms = 5000,
+        .idle_core_mask = (1 << 0),
+        .trigger_panic = true
+    };
+
+    esp_err_t err = esp_task_wdt_init(&twdt_config);
+    if (err == ESP_ERR_INVALID_STATE) {
+        ESP_LOGI("WDT", "TWDT already initialized");
+    } else {
+        ESP_ERROR_CHECK(err);
+    }
+}
+extern "C" void app_main() {
+     wifi_init_apsta();
 
     // 等待连接路由器成功
     EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
@@ -448,23 +524,8 @@ extern "C" void  app_main(void) {
     } else {
         ESP_LOGE(TAG, "连接失败！");
     }
-init_camera();
-    //start_webserver(); 
-    //
-    // xTaskCreate(tensor_task, "tensor_task", 8192, NULL, 5, NULL);
-    while(true)
-    {
-        if(tensor_state ==0)
-           xTaskCreate(restart_task, "restart_task", 4096, NULL, 5, NULL);
-        if(tensor_state ==1){
-            
-            ESP_LOGI(TAG, "tensor_task start");
-            //xTaskCreate(tensor_task, "tensor_task", 8192, NULL, 5, NULL); 
-            tensor_task(); 
-            tensor_state=0;
-            // vTaskDelete(NULL);
-        }
-         vTaskDelay(30000 / portTICK_PERIOD_MS); 
-    }
-    // 你可以添加更多任务：如启动 HTTP 服务器等
+    init_camera();
+    xTaskCreate(start_webserver, "start_webserver", 4096, NULL, 5, NULL);
+    init_task_watchdog_once(); 
+        xTaskCreate(main_task, "main_task", 4096, NULL, 5, NULL);
 }
