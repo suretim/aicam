@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package federated_learning;
+
+// python -m grpc_tools.protoc --proto_path=./ --python_out=. --grpc_python_out=. model.proto
+//定义模型参数消息
+message ModelParams {
+  repeated float weights = 1;  // 模型权重
+  int32 client_id = 2;         // 客户端标识
+}
+
+// 定义服务器响应
+message ServerResponse {
+  string message = 1;          // 响应消息
+}
+
+// 定义服务接口
+service FederatedLearning {
+  // 客户端上传模型参数
+  rpc UploadModelParams(ModelParams) returns (ServerResponse);
+}

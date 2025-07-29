@@ -63,7 +63,7 @@ httpd_uri_t stream_uri = {
     .handler = stream_handler
 };
 TaskHandle_t tensor_task_handle = NULL;
-float  feat_out[NUM_BATCH*EMBEDDING_DIM ];
+float  feat_out[EMBEDDING_DIM ];
 // float min_dist = INFINITY;
 //         int pred = -1; 
 //void tensor_task(void)

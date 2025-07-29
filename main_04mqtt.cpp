@@ -138,7 +138,7 @@ void start_mqtt_client() {
     char json[128];
     snprintf(json, sizeof(json),
              "{\"class\":\"%s\", \"confidence\":%.3f}",
-             class_names[0], 0.5);
+             class_names[0], 0.15);
     mqtt_send_result(mqtt_client, json);
 }
 

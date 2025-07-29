@@ -1,5 +1,6 @@
 idf_component_register(
-        SRCS  "wifi_apsta.cpp" "encoder_model.cc" "mqtt_upload.cc" "camera_config.cc"
+        #SRCS  "wifi_apsta.cpp" "encoder_model.cc" "mqtt_upload.cc" "camera_config.cc"
+        SRCS  "main_mqtt.cpp" "mqtt_upload.cc" 
         #SRCS  "main_04mqtt.cpp" 
         PRIV_INCLUDE_DIRS .
         #REQUIRES mqtt
