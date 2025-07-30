@@ -14,17 +14,17 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0bmodel.proto\x12\x12\x66\x65\x64\x65rated_learning\"1\n\x0bModelParams\x12\x0f\n\x07weights\x18\x01 \x03(\x02\x12\x11\n\tclient_id\x18\x02 \x01(\x05\"!\n\x0eServerResponse\x12\x0f\n\x07message\x18\x01 \x01(\t2m\n\x11\x46\x65\x64\x65ratedLearning\x12X\n\x11UploadModelParams\x12\x1f.federated_learning.ModelParams\x1a\".federated_learning.ServerResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0bmodel.proto\"1\n\x0bModelParams\x12\x0f\n\x07weights\x18\x01 \x03(\x02\x12\x11\n\tclient_id\x18\x02 \x01(\x05\"V\n\x0eServerResponse\x12\x0f\n\x07message\x18\x01 \x01(\t\x12\x19\n\x11update_successful\x18\x02 \x01(\x08\x12\x18\n\x10update_timestamp\x18\x03 \x01(\x03\x32y\n\x11\x46\x65\x64\x65ratedLearning\x12\x32\n\x11UploadModelParams\x12\x0c.ModelParams\x1a\x0f.ServerResponse\x12\x30\n\x0fGetUpdateStatus\x12\x0c.ModelParams\x1a\x0f.ServerResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'model_pb2', _globals)
 if _descriptor._USE_C_DESCRIPTORS == False:
   DESCRIPTOR._options = None
-  _globals['_MODELPARAMS']._serialized_start=35
-  _globals['_MODELPARAMS']._serialized_end=84
-  _globals['_SERVERRESPONSE']._serialized_start=86
-  _globals['_SERVERRESPONSE']._serialized_end=119
-  _globals['_FEDERATEDLEARNING']._serialized_start=121
-  _globals['_FEDERATEDLEARNING']._serialized_end=230
+  _globals['_MODELPARAMS']._serialized_start=15
+  _globals['_MODELPARAMS']._serialized_end=64
+  _globals['_SERVERRESPONSE']._serialized_start=66
+  _globals['_SERVERRESPONSE']._serialized_end=152
+  _globals['_FEDERATEDLEARNING']._serialized_start=154
+  _globals['_FEDERATEDLEARNING']._serialized_end=275
 # @@protoc_insertion_point(module_scope)

@@ -6,8 +6,7 @@ import model_pb2 as model__pb2
 
 
 class FederatedLearningStub(object):
-    """定义服务接口
-    """
+    """Missing associated documentation comment in .proto file."""
 
     def __init__(self, channel):
         """Constructor.
@@ -16,19 +15,28 @@ class FederatedLearningStub(object):
             channel: A grpc.Channel.
         """
         self.UploadModelParams = channel.unary_unary(
-                '/federated_learning.FederatedLearning/UploadModelParams',
+                '/FederatedLearning/UploadModelParams',
+                request_serializer=model__pb2.ModelParams.SerializeToString,
+                response_deserializer=model__pb2.ServerResponse.FromString,
+                )
+        self.GetUpdateStatus = channel.unary_unary(
+                '/FederatedLearning/GetUpdateStatus',
                 request_serializer=model__pb2.ModelParams.SerializeToString,
                 response_deserializer=model__pb2.ServerResponse.FromString,
                 )
 
 
 class FederatedLearningServicer(object):
-    """定义服务接口
-    """
+    """Missing associated documentation comment in .proto file."""
 
     def UploadModelParams(self, request, context):
-        """客户端上传模型参数
-        """
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetUpdateStatus(self, request, context):
+        """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -41,16 +49,20 @@ def add_FederatedLearningServicer_to_server(servicer, server):
                     request_deserializer=model__pb2.ModelParams.FromString,
                     response_serializer=model__pb2.ServerResponse.SerializeToString,
             ),
+            'GetUpdateStatus': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetUpdateStatus,
+                    request_deserializer=model__pb2.ModelParams.FromString,
+                    response_serializer=model__pb2.ServerResponse.SerializeToString,
+            ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'federated_learning.FederatedLearning', rpc_method_handlers)
+            'FederatedLearning', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
 
 
  # This class is part of an EXPERIMENTAL API.
 class FederatedLearning(object):
-    """定义服务接口
-    """
+    """Missing associated documentation comment in .proto file."""
 
     @staticmethod
     def UploadModelParams(request,
@@ -63,7 +75,24 @@ class FederatedLearning(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/federated_learning.FederatedLearning/UploadModelParams',
+        return grpc.experimental.unary_unary(request, target, '/FederatedLearning/UploadModelParams',
+            model__pb2.ModelParams.SerializeToString,
+            model__pb2.ServerResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetUpdateStatus(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/FederatedLearning/GetUpdateStatus',
             model__pb2.ModelParams.SerializeToString,
             model__pb2.ServerResponse.FromString,
             options, channel_credentials,

@@ -35,11 +35,6 @@
 #include <esp_task_wdt.h>
 #define MODEL_INPUT_SIZE 64
 
-#define WIFI_SSID_STA      "1573"
-#define WIFI_PASS_STA      "987654321"
-
-#define WIFI_SSID_AP       "ESP32-AP"
-#define WIFI_PASS_AP       "12345678"
 
 static const char *TAG = "wifi_apsta";
 static EventGroupHandle_t s_wifi_event_group;
