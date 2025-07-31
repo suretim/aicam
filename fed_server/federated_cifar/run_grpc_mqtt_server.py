@@ -129,7 +129,7 @@ def on_connect(client, userdata, flags, rc):
     if rc == 0:
         print("Connected to MQTT broker successfully!")
         # 连接成功后，订阅一个主题
-        client.subscribe("model/params")
+        client.subscribe("model/update")
     else:
         print("Failed to connect, return code:", rc)
 
@@ -165,30 +165,6 @@ def on_message(client, userdata, msg):
     except Exception as e:
         print(f"Unexpected error in on_message: {e}")
 
-
-
-
-
-def on_message2 (client, userdata, msg):
-    #global model_params
-    print(f"Received MQTT message: {msg.payload.decode()}")
-    # 将 MQTT 消息解析成模型参数
-    try:
-        message = json.loads(msg.payload.decode())
-        model_params = message['weights']  # 假设传递的消息格式为 {'weights': [...]}
-
-        print(f"Updated model parameters: {model_params}")
-
-        # 将接收到的参数通过 gRPC 上传到服务器
-        grpc_channel = grpc.insecure_channel(GRPC_SERVER)
-        stub = model_pb2_grpc.FederatedLearningStub(grpc_channel)
-
-        request = model_pb2.ModelParams(client_id=1, weights=model_params)
-        response = stub.UploadModelParams(request)
-        print(f"gRPC server response: {response.message}")
-
-    except Exception as e:
-        print(f"Error processing MQTT message: {e}")
 
 
 def mqtt_subscribe():

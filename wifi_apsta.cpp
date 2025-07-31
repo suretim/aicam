@@ -261,68 +261,68 @@ void fb_gfx_drawFastVLine(fb_data_t *fb, int32_t x, int32_t y, int32_t h, uint32
     fb_gfx_fillRect(fb, x, y, 1, h, color);
 }
 
-void wifi_init_apsta(void) {
-    s_wifi_event_group = xEventGroupCreate();
+// void wifi_init_apsta(void) {
+//     s_wifi_event_group = xEventGroupCreate();
 
-    // 初始化NVS（必须）
-    ESP_ERROR_CHECK(nvs_flash_init());
-    ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
+//     // 初始化NVS（必须）
+//     ESP_ERROR_CHECK(nvs_flash_init());
+//     ESP_ERROR_CHECK(esp_netif_init());
+//     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
-    esp_netif_create_default_wifi_sta();
-    esp_netif_create_default_wifi_ap();
+//     esp_netif_create_default_wifi_sta();
+//     esp_netif_create_default_wifi_ap();
 
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+//     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+//     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
-    // 注册事件处理器
-    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_event_handler, NULL));
+//     // 注册事件处理器
+//     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL));
+//     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_event_handler, NULL));
 
-    // 配置 STA
-    // wifi_config_t sta_config = {
-    //     .sta = {
-    //         .ssid = WIFI_SSID_STA,
-    //         .password = WIFI_PASS_STA,
-    //         .threshold.authmode = WIFI_AUTH_WPA2_PSK,
-    //     },
-    // };
-wifi_config_t sta_config= {};
- strcpy((char *)sta_config.sta.ssid, WIFI_SSID_STA); 
-    strcpy((char *)sta_config.sta.password, WIFI_PASS_STA); 
-sta_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
+//     // 配置 STA
+//     // wifi_config_t sta_config = {
+//     //     .sta = {
+//     //         .ssid = WIFI_SSID_STA,
+//     //         .password = WIFI_PASS_STA,
+//     //         .threshold.authmode = WIFI_AUTH_WPA2_PSK,
+//     //     },
+//     // };
+// wifi_config_t sta_config= {};
+//  strcpy((char *)sta_config.sta.ssid, WIFI_SSID_STA); 
+//     strcpy((char *)sta_config.sta.password, WIFI_PASS_STA); 
+// sta_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
 
 
-    // 配置 AP
-    // wifi_config_t ap_config = {
-    //     .ap = {
-    //         .ssid = WIFI_SSID_AP,
-    //         .ssid_len = strlen(WIFI_SSID_AP),
-    //         .password = WIFI_PASS_AP,
-    //         .max_connection = 4,
-    //         .authmode = WIFI_AUTH_WPA_WPA2_PSK
-    //     },
-    // };
+//     // 配置 AP
+//     // wifi_config_t ap_config = {
+//     //     .ap = {
+//     //         .ssid = WIFI_SSID_AP,
+//     //         .ssid_len = strlen(WIFI_SSID_AP),
+//     //         .password = WIFI_PASS_AP,
+//     //         .max_connection = 4,
+//     //         .authmode = WIFI_AUTH_WPA_WPA2_PSK
+//     //     },
+//     // };
   
-wifi_config_t ap_config= {};
- strcpy((char *)ap_config.ap.ssid, WIFI_SSID_AP); 
-    strcpy((char *)ap_config.ap.password, WIFI_PASS_AP);
-ap_config.ap.ssid_len = strlen(WIFI_SSID_AP);
-ap_config.ap.max_connection = 4;
-ap_config.ap.authmode = WIFI_AUTH_WPA_WPA2_PSK;
+// wifi_config_t ap_config= {};
+//  strcpy((char *)ap_config.ap.ssid, WIFI_SSID_AP); 
+//     strcpy((char *)ap_config.ap.password, WIFI_PASS_AP);
+// ap_config.ap.ssid_len = strlen(WIFI_SSID_AP);
+// ap_config.ap.max_connection = 4;
+// ap_config.ap.authmode = WIFI_AUTH_WPA_WPA2_PSK;
 
 
-    if (strlen(WIFI_PASS_AP) == 0) {
-        ap_config.ap.authmode = WIFI_AUTH_OPEN;
-    }
+//     if (strlen(WIFI_PASS_AP) == 0) {
+//         ap_config.ap.authmode = WIFI_AUTH_OPEN;
+//     }
 
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));  // AP + STA 模式
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &sta_config));
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap_config));
-    ESP_ERROR_CHECK(esp_wifi_start());
+//     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));  // AP + STA 模式
+//     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &sta_config));
+//     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap_config));
+//     ESP_ERROR_CHECK(esp_wifi_start());
 
-    ESP_LOGI(TAG, "Wi-Fi AP+STA 初始化完成");
-}
+//     ESP_LOGI(TAG, "Wi-Fi AP+STA 初始化完成");
+// }
   
 //流处理程序
 static esp_err_t stream_handler(httpd_req_t *req)

@@ -4,19 +4,14 @@
  #include <string>
 #include <sstream>
 #include <stdlib.h>
-//#define MQTT_BROKER_URI "mqtt://192.168.133.128:1883"
-#define MQTT_BROKER_URI "mqtt://192.168.0.57:1883"
+#include "mqtt_upload.h"
+#include "classifier.h"
 
-#define MQTT_USERNAME "tim"
-#define MQTT_PASSWORD "tim"
-#define MQTT_CLIENT_ID_PREFIX "mqttx_" 
-#define MQTT_TOPIC_PUB "model/params"
-#define MQTT_TOPIC_SUB "capture/mqttx_"
-#define MQTT_KEEPALIVE_SECONDS 60
+//#define MQTT_BROKER_URI "mqtt://192.168.133.128:1883"
 
 #define TAG "MQTT"
 static esp_mqtt_client_handle_t mqtt_client = NULL;
- static char client_id[64]=MQTT_CLIENT_ID_PREFIX;
+char client_id[64]=MQTT_CLIENT_ID_PREFIX;
  float  feat_out[EMBEDDING_DIM ]= {
 0.2,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,
 0.2,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,
@@ -49,6 +44,46 @@ void publish_feature_vector(  const char* topic) {
     }
 }
 
+
+#include "cJSON.h"
+
+void handle_mqtt_message(const char *json_str) {
+    cJSON *root = cJSON_Parse(json_str);
+    if (!root) {
+        printf("Failed to parse JSON\n");
+        return;
+    }
+
+    // weights
+    cJSON *weights_array = cJSON_GetObjectItem(root, "mqtrx_weights");
+    cJSON *bias_array = cJSON_GetObjectItem(root, "mqtrx_bias");
+
+    if (!weights_array || !bias_array) {
+        printf("Missing fields in JSON\n");
+        cJSON_Delete(root);
+        return;
+    }
+
+    int weight_len = cJSON_GetArraySize(weights_array);
+    int bias_len = cJSON_GetArraySize(bias_array);
+
+    float *weights = (float *)malloc(sizeof(float) * weight_len);
+    float *bias =  (float *)malloc(sizeof(float) * bias_len);
+
+    for (int i = 0; i < weight_len; ++i)
+        weights[i] = (float)cJSON_GetArrayItem(weights_array, i)->valuedouble;
+
+    for (int i = 0; i < bias_len; ++i)
+        bias[i] = (float)cJSON_GetArrayItem(bias_array, i)->valuedouble;
+
+    // ✅ 传给分类器
+    classifier_set_params(weights, bias, weight_len, bias_len);
+
+    cJSON_Delete(root);
+    free(weights);
+    free(bias);
+}
+
 // ---------------- MQTT 接收 & 指令处理 ----------------
 static esp_err_t mqtt_event_handler_cb(esp_mqtt_event_handle_t event) {
     switch (event->event_id) {
@@ -66,6 +101,9 @@ static esp_err_t mqtt_event_handler_cb(esp_mqtt_event_handle_t event) {
         if (msg != NULL) {
             // 简单检查是否包含指令字段
             //if (strstr(msg, "\"capture\"") && strstr(msg, client_id)) {
+            if (strstr(msg, "\"mqtrx_\"") ) {
+               handle_mqtt_message( msg ); 
+            }
             if (strstr(msg, "\"mqttx_\"") ) {
                 ESP_LOGI(TAG, "Parsed command: capture");
 
