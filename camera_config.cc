@@ -54,7 +54,7 @@ static camera_config_t camera_config = {
 //.fb_location = CAMERA_FB_IN_DRAM,   // 而不是 CAMERA_FB_IN_PSRAM
 //.fb_count = 1,                      // 只用一帧缓存，避免超限
 
-esp_err_t init_camera(void)
+esp_err_t init_esp32_camera(void)
 {
     esp_err_t err = esp_camera_init(&camera_config);
     if (err != ESP_OK)
@@ -74,6 +74,3 @@ esp_err_t init_camera(void)
 
     return ESP_OK;
 }
-
-
- 

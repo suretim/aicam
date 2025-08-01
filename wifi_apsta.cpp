@@ -62,7 +62,7 @@ float  feat_out[EMBEDDING_DIM ];
 // float min_dist = INFINITY;
 //         int pred = -1; 
 //void tensor_task(void)
-float g_buffer[MODEL_INPUT_SIZE*MODEL_INPUT_SIZE];
+//float g_buffer[MODEL_INPUT_SIZE*MODEL_INPUT_SIZE];
 static void tensor_prework(void)
 {
      if (fb == NULL) {
@@ -105,7 +105,7 @@ static void tensor_prework(void)
 }
 
 
-static void tensor_task(void *arg)
+static void tensor_2task(void *arg)
 {
     esp_task_wdt_add(NULL);  // 注册到 watchdog
   //vTaskDelay(50 / portTICK_PERIOD_MS);  // 延迟50ms

@@ -7,7 +7,7 @@
 #define MQTT_TOPIC_PUB "model/params"
 #define MQTT_TOPIC_SUB "capture/mqttx_"
 #define MQTT_KEEPALIVE_SECONDS 60
-
+void  get_mqtt_feature(const float *f_in);
 void mqtt_app_start();
 void start_mqtt_client(void);
 void publish_feature_vector(const float* vec, int len, const char* topic);

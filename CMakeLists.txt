@@ -4,7 +4,7 @@ if("${IDF_VERSION_MAJOR}.${IDF_VERSION_MINOR}" VERSION_GREATER  "5.0")
 idf_component_register(
         PRIV_INCLUDE_DIRS .        
         #for http_web
-        SRCS "grpc_client.cpp" "http_web.cpp" "run_inference.cc" "classifier.cc" "camera_config.cc" "wifi_config.cc" "mqtt_upload.cc" "model_data.cc"
+        SRCS  "grpc_client.cpp" "http_web.cpp" "run_inference.cc" "classifier.cc" "camera_config.cc" "wifi_config.cc" "mqtt_upload.cc" "model_data.cc"
         EMBED_FILES "web_content/index_http.html" "web_content/index_socket.html" "web_content/index_ecm.html"
         #for main.cpp
         #SRCS  "wifi_apsta.cpp" "encoder_model.cc" "mqtt_upload.cc" "camera_config.cc"
@@ -20,7 +20,7 @@ else()
 idf_component_register(
         PRIV_INCLUDE_DIRS .        
         #for http_web
-        SRCS "http_web.cpp"  "camera_config.cc" "wifi_config.cc" "mqtt_upload.cc"
+        SRCS "web_server.cc" "http_web.cpp"  "camera_config.cc" "wifi_config.cc" "mqtt_upload.cc"
         #SRCS "grpc_client.cpp" "http_web.cpp"  "camera_config.cc" "wifi_config.cc" "mqtt_upload.cc"
         EMBED_FILES "web_content/index_http.html" "web_content/index_socket.html" "web_content/index_ecm.html"
         #for main.cpp

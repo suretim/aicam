@@ -3,7 +3,7 @@
 #include "img_converters.h"
 
 
-httpd_handle_t start_webserver() {
+httpd_handle_t start_1webserver() {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     if(ESP_OK != httpd_start(&server, &config))
         ESP_LOGE(TAG, "httpd_start failed");

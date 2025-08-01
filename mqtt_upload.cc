@@ -1,34 +1,43 @@
 #include "mqtt_client.h"
 #include "esp_log.h"
-#include "class_prototypes.h"
+//#include "class_prototypes.h"
  #include <string>
 #include <sstream>
 #include <stdlib.h>
 #include "mqtt_upload.h"
 #include "classifier.h"
-
+#define INFINITY 1000 
+#define NUM_CLASSES 2
+#define EMBEDDING_DIM 64
 //#define MQTT_BROKER_URI "mqtt://192.168.133.128:1883"
 
 #define TAG "MQTT"
 static esp_mqtt_client_handle_t mqtt_client = NULL;
 char client_id[64]=MQTT_CLIENT_ID_PREFIX;
- float  feat_out[EMBEDDING_DIM ]= {
+ float  f_out[EMBEDDING_DIM ]= {
 0.2,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,
 0.2,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,
 0.2,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,
 0.2,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1
 };
 
-
+void  get_mqtt_feature(const float *f_in)
+{
+    for (int i=0;i<EMBEDDING_DIM;i++)
+    {
+        f_out[i]=f_in[i];
+    }
+   return  ;
+}
 
 
 // 将 float 数组格式化为 JSON 并上传
-void publish_feature_vector(  const char* topic) {
+void publish_feature_vector(  const char* topic ) {
     std::stringstream ss;
     ss << "{\"weights\":[";
 
     for (int i = 0; i < EMBEDDING_DIM; ++i) {
-        ss << feat_out[i];
+        ss << f_out[i];
         if (i != EMBEDDING_DIM - 1) ss << ",";
     }
 

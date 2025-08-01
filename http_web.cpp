@@ -711,7 +711,7 @@ void video_stream_task(void *pvParameters) {
     }
 }
 
-httpd_handle_t start_webserver() {
+httpd_handle_t start_esp32ap_webserver() {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.max_uri_handlers = 16;
     config.max_resp_headers = 16;
