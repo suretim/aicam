@@ -4,7 +4,7 @@
  #include <string>
 #include <sstream>
 #include <stdlib.h>
-#include "mqtt_upload.h"
+//#include "mqtt_upload.h"
 #include "classifier.h"
 #define INFINITY 1000 
 #define NUM_CLASSES 2
@@ -12,6 +12,16 @@
 //#define MQTT_BROKER_URI "mqtt://192.168.133.128:1883"
 
 #define TAG "MQTT"
+#define MQTT_BROKER_URI "mqtt://192.168.68.237:1883"
+
+#define MQTT_USERNAME "tim"
+#define MQTT_PASSWORD "tim"
+#define MQTT_CLIENT_ID_PREFIX "mqttx_" 
+#define MQTT_TOPIC_PUB "model/params"
+#define MQTT_TOPIC_SUB "capture/mqttx_"
+#define MQTT_KEEPALIVE_SECONDS 60
+
+
 static esp_mqtt_client_handle_t mqtt_client = NULL;
 char client_id[64]=MQTT_CLIENT_ID_PREFIX;
  float  f_out[EMBEDDING_DIM ]= {
@@ -21,6 +31,12 @@ char client_id[64]=MQTT_CLIENT_ID_PREFIX;
 0.2,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1
 };
 
+  float g_weights[CLASSIFIER_OUTPUT_DIM][CLASSIFIER_INPUT_DIM];
+  float g_bias[CLASSIFIER_OUTPUT_DIM];
+void classifier_set_params(const float *weights, const float *bias, int input_dim, int output_dim) {
+    memcpy(g_weights, weights, sizeof(g_weights));
+    memcpy(g_bias, bias, sizeof(g_bias));
+}
 void  get_mqtt_feature(const float *f_in)
 {
     for (int i=0;i<EMBEDDING_DIM;i++)

@@ -9,7 +9,7 @@ predicted_class = "disease"  # or "healthy"
 distance = 0.22  # 可选，用于置信度参考
 
 # ==== MQTT 参数配置 ====
-MQTT_BROKER = "broker.hivemq.com"      # 改为你自己的 broker 地址
+MQTT_BROKER = "192.168.68.237"      # 改为你自己的 broker 地址
 MQTT_PORT = 1883
 MQTT_TOPIC = "smartagriculture/leaf_detection"
 

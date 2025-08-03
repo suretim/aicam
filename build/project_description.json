@@ -1,7 +1,7 @@
 {
     "version":            "1.1",
     "project_name":       "camera_ai",
-    "project_version":    "a8bb135-dirty",
+    "project_version":    "3016733-dirty",
     "project_path":       "D:/tim/aicam",
     "idf_path":           "C:/Espressif/frameworks/esp-idf-v5.1.6",
     "build_dir":          "D:/tim/aicam/build",
@@ -580,7 +580,7 @@
             "managed_reqs": [],
             "managed_priv_reqs": [],
             "file": "D:/tim/aicam/build/esp-idf/main/libmain.a",
-            "sources": [ "D:/tim/aicam/main/main_grpc_client.cpp", "D:/tim/aicam/main/http_web.cpp", "D:/tim/aicam/main/img_inference.cc", "D:/tim/aicam/main/classifier.cc", "D:/tim/aicam/main/camera_config.cc", "D:/tim/aicam/main/wifi_config.cc", "D:/tim/aicam/main/mqtt_upload.cc", "D:/tim/aicam/main/model_data.cc", "D:/tim/aicam/build/index_http.html.S", "D:/tim/aicam/build/index_socket.html.S", "D:/tim/aicam/build/index_ecm.html.S" ],
+            "sources": [ "D:/tim/aicam/main/main_mqtt.cpp", "D:/tim/aicam/main/mqtt_upload.cc", "D:/tim/aicam/main/wifi_config.cc" ],
             "include_dirs": []
         },
         "mbedtls": {

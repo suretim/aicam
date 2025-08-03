@@ -2,13 +2,9 @@
 #include <string.h>
 #include <math.h>
 
-static float g_weights[CLASSIFIER_OUTPUT_DIM][CLASSIFIER_INPUT_DIM];
-static float g_bias[CLASSIFIER_OUTPUT_DIM];
+extern float g_weights[CLASSIFIER_OUTPUT_DIM][CLASSIFIER_INPUT_DIM];
+extern float g_bias[CLASSIFIER_OUTPUT_DIM];
 
-void classifier_set_params(const float *weights, const float *bias, int input_dim, int output_dim) {
-    memcpy(g_weights, weights, sizeof(g_weights));
-    memcpy(g_bias, bias, sizeof(g_bias));
-}
 //     float * g_weights;  // 长度为 input_dim * output_dim
 //     float *g_bias;
 // static int g_input_dim;
