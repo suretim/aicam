@@ -6,14 +6,16 @@
 #include <stdlib.h>
 //#include "mqtt_upload.h"
 #include "classifier.h"
-#define INFINITY 1000 
+//#define INFINITY 1000 
 #define NUM_CLASSES 2
 #define EMBEDDING_DIM 64
 #define TAG "MQTT"
 //#define MQTT_BROKER_URI "mqtt://192.168.133.128:1883"
-//#define MQTT_BROKER_URI "mqtt://192.168.68.237:1883"
+#if 1
+#define MQTT_BROKER_URI "mqtt://192.168.68.237:1883"
+#else
 #define MQTT_BROKER_URI "mqtt://192.168.0.57:1883"
-
+#endif
 #define MQTT_USERNAME "tim"
 #define MQTT_PASSWORD "tim"
 #define MQTT_CLIENT_ID_PREFIX "mqttx_" 
@@ -48,7 +50,7 @@ void  get_mqtt_feature(  float *f_in)
 
 
 // 将 float 数组格式化为 JSON 并上传
-void publish_feature_vector( const   char* topic ) {
+void publish_feature_vector(void) {
     std::stringstream ss;
     ss << "{\"weights\":[";
 
@@ -61,7 +63,7 @@ void publish_feature_vector( const   char* topic ) {
 
     std::string payload = ss.str();
 
-    int msg_id = esp_mqtt_client_publish(mqtt_client, topic, payload.c_str(), payload.length(), 1, 0);
+    int msg_id = esp_mqtt_client_publish(mqtt_client, MQTT_TOPIC_PUB, payload.c_str(), payload.length(), 1, 0);
     if (msg_id != -1) {
         ESP_LOGI("MQTT", "Published feature vector, msg_id=%d", msg_id);
     } else {
@@ -134,7 +136,7 @@ static esp_err_t mqtt_event_handler_cb(esp_mqtt_event_handle_t event) {
 
                 // 模拟响应：发布推理结果
 #if 1
-                publish_feature_vector( MQTT_TOPIC_PUB);
+                publish_feature_vector();
 #else
                 char json[128];
                 snprintf(json, sizeof(json),
@@ -207,34 +209,5 @@ void start_mqtt_client (void) {
 
     #define ESP_EVENT_ANY_ID     ((esp_mqtt_event_id_t) -1)
     esp_mqtt_client_register_event(mqtt_client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
-    ESP_ERROR_CHECK(esp_mqtt_client_start(mqtt_client));
-//#if 0
-     
-//        publish_feature_vector( MQTT_TOPIC_PUB);
-     
-//#else
-//  float min_dist = INFINITY;
-//     int pred = 0;   
-//     for (int c = 0; c < NUM_CLASSES; ++c) {
-//         float dist = 0.0f;
-         
-//         for (int j = 0; j < EMBEDDING_DIM; ++j) {
-//             float diff = feat[ j ] - class_prototypes[c][j];
-//             dist += diff * diff;
-//         }
-//         if (dist < min_dist) {
-//             min_dist = dist;
-//             pred = c;
-//         }
-//     }
-     
-    // 发布推理结果
-
-//     char json[128];
-//     snprintf(json, sizeof(json),
-//              "{\"class\":\"%s\", \"confidence\":%.3f}",
-//              class_names[0], 0.4);
-//     mqtt_send_result(mqtt_client, json);
-// #endif 
-    //ESP_LOGI(TAG," tensor OK %s\r\n",json);
+    ESP_ERROR_CHECK(esp_mqtt_client_start(mqtt_client)); 
 }

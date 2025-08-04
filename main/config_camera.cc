@@ -9,9 +9,6 @@
 #include "freertos/task.h"  
 
 
-#define RGB565          0
-#define RGB888        1
-#define RGBTYPE        RGB565
 //#include <esp_system.h>
 static const char *TAG = "esp_camera";
  #define CAM_PIN_PWDN    -1
@@ -87,76 +84,3 @@ esp_err_t init_esp32_camera(void)
 }
 
 
-
- //extern      SemaphoreHandle_t web_send_mutex;
-// Get an image from the camera module
-esp_err_t GetESPImage(int image_width, int image_height, int channels,   float* image_data) {
-    //if (xSemaphoreTake(web_send_mutex, portMAX_DELAY) == pdTRUE){
-        camera_fb_t* fb = esp_camera_fb_get();
-        if (!fb) {
-            ESP_LOGE(TAG, "Camera capture failed");
-            return ESP_FAIL;
-        }  
-    //     xSemaphoreGive(web_send_mutex);
-    //}
-#if RGBTYPE   ==     RGB888
-
-    uint8_t *rgb888_buf = (uint8_t *)heap_caps_malloc(fb->width * fb->height * 3, MALLOC_CAP_SPIRAM);
-    if(rgb888_buf == NULL)
-    {
-        esp_camera_fb_return(fb); 
-        ESP_LOGE(TAG, "rgb888_buf failed " );
-        return ESP_FAIL;
-    }
-    if(fmt2rgb888(fb->buf, fb->len, fb->format, rgb888_buf) != true)
-    {
-        ESP_LOGE(TAG, "fmt2rgb888 failed, fb: %d", fb->len);
-        esp_camera_fb_return(fb);
-        free(rgb888_buf);
-        return ESP_FAIL;
-    }
- #endif
- #if 1
-  
-    for (int i = 0; i < image_width* image_height*channels; i++) {
-        image_data[i] = 0.0f;  // 示例全部清零
-    }
- #else
-    const int src_w = fb->width;
-    const int src_h = fb->height;
-    const uint8_t* src =fb->buf;// rgb888_buf;//fb->buf;
-    for (int y = 0; y < image_height; ++y) {
-        for (int x = 0; x < image_width; ++x) {
-            // 最近邻采样：将 160x120 → 64x64
-            int src_x = x * src_w / image_width;
-            int src_y = y * src_h / image_height;
-            int index = (src_y * src_w + src_x) * 2; // 每像素2字节(RGB565)
-
-            // 提取 RGB565 中的灰度近似
-            uint8_t byte1 = src[index];
-            uint8_t byte2 = src[index + 1];
-
-            // 解码 RGB565 → 灰度
-            uint8_t r = (byte2 & 0xF8);
-            uint8_t g = ((byte2 & 0x07) << 5) | ((byte1 & 0xE0) >> 3);
-            uint8_t b = (byte1 & 0x1F) << 3;
-            //float gray = (r * 30 + g * 59 + b * 11) / 100;
-
-            // 写入模型输入张量
-            int input_index = y * image_height + x;
-            image_data[input_index*channels+0]  = r * 30.0f;  // 归一化为 float32
-            image_data[input_index*channels+1]  = g * 59.0f;  // 归一化为 float32
-            image_data[input_index*channels+2]  = b * 11.0f;  // 归一化为 float32
-        }
-    }   
-    #endif
-    esp_camera_fb_return(fb);
-#if RGBTYPE   ==     RGB888
-    free(rgb888_buf);  
-#endif
-    size_t free_heap = esp_get_free_heap_size();
-    printf("Free heap memory: %d bytes\n", free_heap);
-  /* here the esp camera can give you grayscale image directly */
-  return ESP_OK; 
-}
- 

@@ -17,9 +17,9 @@
 #define MODEL_INPUT_SIZE 64
 #define EMBEDDING_DIM 64
 
-constexpr int kNumCols = 64;
-constexpr int kNumRows = 64;
-constexpr int kNumChannels = 3;
+#define RGB565          0
+#define RGB888        1
+#define RGBTYPE        RGB565
 //static u_int8_t tensor_state=0;
 
 //float g_buffer[MODEL_INPUT_SIZE*MODEL_INPUT_SIZE];
@@ -48,8 +48,8 @@ const tflite::Model* model = nullptr;
 tflite::MicroInterpreter* interpreter = nullptr;
 TfLiteTensor* input = nullptr;
  TfLiteTensor* output= nullptr;
-   float* output_data=nullptr;
-   float* input_data=nullptr;
+  //  float* output_data=nullptr;
+  //  float* input_data=nullptr;
 // In order to use optimized tensorflow lite kernels, a signed int8_t quantized
 // model is preferred over the legacy unsigned model format. This means that
 // throughout this project, input images must be converted from unisgned to
@@ -77,10 +77,123 @@ void reset_tensor(void)
   heap_caps_free(tensor_arena);
 }
 
+ //extern      SemaphoreHandle_t web_send_mutex;
+// Get an image from the camera module
+TfLiteStatus GetESPImage(void) {
+  
+  int image_width = input->dims->data[1];
+  int image_height = input->dims->data[2];
+  int channels = input->dims->data[3];
+    //if (xSemaphoreTake(web_send_mutex, portMAX_DELAY) == pdTRUE){
+        camera_fb_t* fb = esp_camera_fb_get();
+        if (!fb) {
+            ESP_LOGE(TAG, "Camera capture failed");
+            return kTfLiteError;
+        }  
+    //     xSemaphoreGive(web_send_mutex);
+    //}
+#if RGBTYPE   ==     RGB888
+
+    uint8_t *rgb888_buf = (uint8_t *)heap_caps_malloc(fb->width * fb->height * 3, MALLOC_CAP_SPIRAM);
+    if(rgb888_buf == NULL)
+    {
+        esp_camera_fb_return(fb); 
+        ESP_LOGE(TAG, "rgb888_buf failed " );
+        return kTfLiteError;
+    }
+    if(fmt2rgb888(fb->buf, fb->len, fb->format, rgb888_buf) != true)
+    {
+        ESP_LOGE(TAG, "fmt2rgb888 failed, fb: %d", fb->len);
+        esp_camera_fb_return(fb);
+        free(rgb888_buf);
+        return kTfLiteError;
+    }
+ #endif
+ #if 0
+  
+    for (int i = 0; i < image_width* image_height*channels; i++) {
+        image_data[i] = 0.0f;  // 示例全部清零
+    }
+ #else
+    const int src_w = fb->width;
+    const int src_h = fb->height;
+    const uint8_t* src =fb->buf;// rgb888_buf;//fb->buf;
+    for (int y = 0; y < image_height; ++y) {
+        for (int x = 0; x < image_width; ++x) {
+            // 最近邻采样：将 160x120 → 64x64
+            int src_x = x * src_w / image_width;
+            int src_y = y * src_h / image_height;
+            int index = (src_y * src_w + src_x) * 2; // 每像素2字节(RGB565)
+
+            // 提取 RGB565 中的灰度近似
+            uint8_t byte1 = src[index];
+            uint8_t byte2 = src[index + 1];
+
+            // 解码 RGB565 → 灰度
+            uint8_t r = (byte2 & 0xF8);
+            uint8_t g = ((byte2 & 0x07) << 5) | ((byte1 & 0xE0) >> 3);
+            uint8_t b = (byte1 & 0x1F) << 3;
+            //float gray = (r * 30 + g * 59 + b * 11) / 100;
+
+            // 写入模型输入张量
+            int input_index = y * image_height + x;
+            input->data.f[input_index*channels+0]  = r * 30.0f;  // 归一化为 float32
+            input->data.f[input_index*channels+1]  = g * 59.0f;  // 归一化为 float32
+            input->data.f[input_index*channels+2]  = b * 11.0f;  // 归一化为 float32
+        }
+    }   
+    #endif
+    esp_camera_fb_return(fb);
+#if RGBTYPE   ==     RGB888
+    free(rgb888_buf);  
+#endif
+    size_t free_heap = esp_get_free_heap_size();
+    printf("Free heap memory: %d bytes\n", free_heap);
+  /* here the esp camera can give you grayscale image directly */
+  return kTfLiteOk; 
+}
+ 
+
+
+
+// The name of this function is important for Arduino compatibility.
+TfLiteStatus loop() {
+ // TfLiteTensor* input = interpreter.input(0);
+// ESP_LOGI(TAG, "Input dims: %d", input->dims->size);
+// for (int i = 0; i < input->dims->size; ++i) {
+//     ESP_LOGI(TAG, "dim %d: %d", i, input->dims->data[i]);
+// }
+
+// if (input->dims->size != 4 || 
+//     input->dims->data[1] != 64 || 
+//     input->dims->data[2] != 64 || 
+//     input->dims->data[3] != 3) {
+//     printf("Error: Unexpected input shape\n");
+//     return kTfLiteError;
+// } 
+   
+  if (kTfLiteOk != GetESPImage()) {
+    MicroPrintf("Image capture failed.");
+    return kTfLiteError;
+  }
+  TfLiteStatus invoke_status = interpreter->Invoke();
+    if (invoke_status != kTfLiteOk) {
+        ESP_LOGE(TAG, "模型推理失败");
+        return kTfLiteError;
+    }
+
+     get_mqtt_feature(output->data.f); 
+    int predicted = classifier_predict(output->data.f);
+    printf("Predicted class: %d\n", predicted); 
+  //vTaskDelay(1); // to avoid watchdog trigger
+  return kTfLiteOk;
+} 
+
+
 extern const unsigned char encoder_model_float[] asm("_binary_encoder_model_tflite_start");
 
 // The name of this function is important for Arduino compatibility.
-TfLiteStatus setup() {
+TfLiteStatus setup(void) {
     // Map the model into a usable data structure. This doesn't involve any
     // copying or parsing, it's a very lightweight operation.
 
@@ -125,7 +238,7 @@ TfLiteStatus setup() {
     MicroPrintf("AllocateTensors() failed");
     return kTfLiteError;
   }
-  //input = interpreter->input(0);
+    input = interpreter->input(0);
     output = interpreter->output(0);
     if (input == nullptr || output == nullptr) {
         ESP_LOGE(TAG, "获取输入输出张量失败");
@@ -133,31 +246,20 @@ TfLiteStatus setup() {
     }
   // Get information about the memory area to use for the model's input.
    
-    input_data = (  float*)output->data.f;
-    output_data = (  float*)output->data.f;
-#if 0    
- ESP_LOGI(TAG, "模型输入大小: %d", input->bytes);
+    // input_data = (  float*)input->data.f;
+    // output_data = (  float*)output->data.f;
+#if 1   
+ //ESP_LOGI(TAG, "模型输入大小: %d", input->bytes);
 
-if (kTfLiteOk != GetESPImage(kNumCols, kNumRows, kNumChannels,input->data.f)) {
-    MicroPrintf("Image capture failed.");
-    return;
+  if (kTfLiteOk != loop()) {
+    MicroPrintf("Image loop failed.");
+    return kTfLiteError;
   }
-    // 11. 模拟输入数据，确保数据符合模型输入格式
-    // 这里假设输入是 float32，大小等于 input->bytes / sizeof(float)
-    // float *input_buffer = input->data.f;
-    // for (int i = 0; i < input->bytes / sizeof(float); i++) {
-    //     input_buffer[i] = 0.0f;  // 示例全部清零
-    // }
-// 12. 推理执行
-    TfLiteStatus invoke_status = interpreter->Invoke();
-    if (invoke_status != kTfLiteOk) {
-        ESP_LOGE(TAG, "模型推理失败");
-        return;
-    }
+    
 
     // 13. 读取输出结果
-    float *output_buffer = output->data.f;
-    int output_size = output->bytes / sizeof(float);
+    //float *output_buffer = output->data.f;
+    //int output_size = output->bytes / sizeof(float);
 
     // ESP_LOGI(TAG, "推理结果：");
     // for (int i = 0; i < output_size; i++) {
@@ -170,42 +272,21 @@ return kTfLiteOk;
 }
 
 
-// The name of this function is important for Arduino compatibility.
-TfLiteStatus loop() {
-     
-  if (kTfLiteOk != GetESPImage(kNumCols, kNumRows, kNumChannels,input->data.f)) {
-    MicroPrintf("Image capture failed.");
-    return kTfLiteError;
-  }
-  TfLiteStatus invoke_status = interpreter->Invoke();
-    if (invoke_status != kTfLiteOk) {
-        ESP_LOGE(TAG, "模型推理失败");
-        return kTfLiteError;
-    }
-
-     get_mqtt_feature(output_data); 
-    int predicted = classifier_predict(output_data);
-    printf("Predicted class: %d\n", predicted); 
-  //vTaskDelay(1); // to avoid watchdog trigger
-  return kTfLiteOk;
-} 
-
 u_int8_t get_tensor_state(void);
 void tensor_server(void) 
 {
 
-     //setup();
+    //  if(kTfLiteError== setup())
+    //   { 
+    //     return;
+    //   } 
      while (true)
      {
-      if(kTfLiteError== setup())
-               { 
-                  break;
-               }
+     
       //if (xSemaphoreTake(web_send_mutex, portMAX_DELAY) == pdTRUE) {
           //if(get_tensor_state()){
-            if(kTfLiteError== loop())
+            if(kTfLiteError== setup())
             {
-              reset_tensor();
               break; 
             }
          // }
@@ -222,10 +303,13 @@ void tensor_server(void)
 void tensor_task(void *arg)
 {
    // esp_task_wdt_add(NULL);  // 注册到 watchdog 
-     setup();
+   
      while (true) {
-        //esp_task_wdt_reset();
-        loop();
+        if(kTfLiteError== setup())
+            {
+              break; 
+            }
+            vTaskDelay(pdMS_TO_TICKS(10000));  
     }  
      //tensor_state =5;  // 处理完成，通知主任务可继续
     
@@ -233,8 +317,9 @@ void tensor_task(void *arg)
      
     //heap_caps_free(tensor_arena);
     //esp_task_wdt_delete(NULL);  // 可选：退出前注销 watchdog
+    reset_tensor();
     vTaskDelete(NULL);  // 删除自己
-    
+   
 }
  
 // void run_encoder_inference(const uint8_t *input_image, float *output_vector) {
