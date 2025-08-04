@@ -10,18 +10,18 @@ if(NOT EXISTS "C:/Espressif/frameworks/esp-idf-v5.1.6/components/bootloader/subp
   file(MAKE_DIRECTORY "C:/Espressif/frameworks/esp-idf-v5.1.6/components/bootloader/subproject")
 endif()
 file(MAKE_DIRECTORY
-  "D:/tim/aicam/build/bootloader"
-  "D:/tim/aicam/build/bootloader-prefix"
-  "D:/tim/aicam/build/bootloader-prefix/tmp"
-  "D:/tim/aicam/build/bootloader-prefix/src/bootloader-stamp"
-  "D:/tim/aicam/build/bootloader-prefix/src"
-  "D:/tim/aicam/build/bootloader-prefix/src/bootloader-stamp"
+  "C:/tim/aicam/build/bootloader"
+  "C:/tim/aicam/build/bootloader-prefix"
+  "C:/tim/aicam/build/bootloader-prefix/tmp"
+  "C:/tim/aicam/build/bootloader-prefix/src/bootloader-stamp"
+  "C:/tim/aicam/build/bootloader-prefix/src"
+  "C:/tim/aicam/build/bootloader-prefix/src/bootloader-stamp"
 )
 
 set(configSubDirs )
 foreach(subDir IN LISTS configSubDirs)
-    file(MAKE_DIRECTORY "D:/tim/aicam/build/bootloader-prefix/src/bootloader-stamp/${subDir}")
+    file(MAKE_DIRECTORY "C:/tim/aicam/build/bootloader-prefix/src/bootloader-stamp/${subDir}")
 endforeach()
 if(cfgdir)
-  file(MAKE_DIRECTORY "D:/tim/aicam/build/bootloader-prefix/src/bootloader-stamp${cfgdir}") # cfgdir has leading slash
+  file(MAKE_DIRECTORY "C:/tim/aicam/build/bootloader-prefix/src/bootloader-stamp${cfgdir}") # cfgdir has leading slash
 endif()

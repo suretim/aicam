@@ -1,4 +1,4 @@
-# Install script for directory: D:/tim/aicam/components/esp32-camera
+# Install script for directory: C:/tim/aicam/components/esp32-camera
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

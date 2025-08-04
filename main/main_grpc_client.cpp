@@ -6,34 +6,23 @@
 #include "esp_system.h"
 #include "esp_spi_flash.h"
 #include "esp_wifi.h"
+#include "esp_http_server.h"
+#include <nvs_flash.h>
 #include "mqtt_client.h"
-#include "mqtt_upload.h"
-#include "img_inference.h" 
-//#include "sensor_module.h"  // 自定义传感器模块（相机、湿度、光感器）
-//#include "esp_camera.h" 
 #include <esp_task_wdt.h>
 
+#include "config_mqtt.h"
+#include "img_inference.h"
 #include "camera_config.h"
-#include "wifi_config.h" 
-#include "esp_http_server.h" 
-
+#include "config_wifi.h"  
 #include "classifier.h"
  
-#include <nvs_flash.h>
-// #include <sys/param.h> 
-// #include "esp_event.h" 
-// #include "freertos/FreeRTOS.h"
-// #include "freertos/task.h"  
-
-// #include "esp_timer.h" 
-// MQTT 配置
-//#define MQTT_BROKER_URI "mqtt://your_broker_address"
 #define MQTT_TOPIC "plant_health"
 
 // TFLite Micro 模型配置
-#define MODEL_PATH "/spiffs/model.tflite" // 你的 TFLite 模型路径
+//#define MODEL_PATH "/spiffs/model.tflite" // 你的 TFLite 模型路径
 //#define INPUT_SIZE 64 // 假设输入图像是 64x64
-#define MODEL_INPUT_SIZE 64
+//#define MODEL_INPUT_SIZE 64
 
 static const char *TAG = "PlantHealth_Client"; 
 httpd_handle_t start_esp32ap_webserver();

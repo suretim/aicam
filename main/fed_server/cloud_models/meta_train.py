@@ -3,7 +3,7 @@ import numpy as np
 #import matplotlib.pyplot as plt
 import os
 from tensorflow.keras import layers, models
-MQTT_BROKER = "192.168.68.237"
+MQTT_BROKER = "192.168.0.57"
 MQTT_PORT = 1883
 # Function: Convert some hex value into an array for C programming
 def hex_to_c_array(hex_data, var_name):
@@ -47,7 +47,7 @@ def hex_to_c_array(hex_data, var_name):
 # ====================
 # 1. 构建轻量CNN特征提取器
 # ====================
-def build_encoder0(input_shape=(64, 64, 3)):
+def build_encoder (input_shape=(64, 64, 3)):
     model = tf.keras.Sequential([
         layers.Conv2D(16, (3, 3), activation='relu', input_shape=(64, 64, 3)),
         layers.MaxPooling2D(),
@@ -59,7 +59,7 @@ def build_encoder0(input_shape=(64, 64, 3)):
         layers.Dense(64)
     ])
     return model
-def build_encoder (input_shape=(64, 64, 3)):
+def build_encoder0 (input_shape=(64, 64, 3)):
     model = models.Sequential([
         layers.Conv2D(16, 3, activation='relu', padding='same'),
         layers.MaxPooling2D(),

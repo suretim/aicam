@@ -1,4 +1,4 @@
-/* * Data converted from D:/tim/aicam/main/web_content/index_socket.html
+/* * Data converted from C:/tim/aicam/main/web_content/index_socket.html
  */
 .data
 .section .rodata.embedded

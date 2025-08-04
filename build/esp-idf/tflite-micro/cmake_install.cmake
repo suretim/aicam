@@ -1,4 +1,4 @@
-# Install script for directory: D:/tim/aicam/components/tflite-micro
+# Install script for directory: C:/tim/aicam/components/tflite-micro
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

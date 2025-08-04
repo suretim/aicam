@@ -3,11 +3,14 @@
 #include <nvs_flash.h>
 #include <sys/param.h>
 #include <string.h>
-#include "esp_camera.h"
- 
-//#include <esp_system.h>
+#include "esp_camera.h" 
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"  
+#define RGB565          0
+#define RGB888        1
+#define RGBTYPE        RGB565
+//#include <esp_system.h>
 static const char *TAG = "esp_camera";
  #define CAM_PIN_PWDN    -1
 #define CAM_PIN_RESET   -1
@@ -81,14 +84,18 @@ esp_err_t init_esp32_camera(void)
 
 
 
-
+ //extern      SemaphoreHandle_t web_send_mutex;
 // Get an image from the camera module
-esp_err_t GetImage(int image_width, int image_height, int channels, uint8_t* image_data) {
-    camera_fb_t* fb = esp_camera_fb_get();
-    if (!fb) {
-        ESP_LOGE(TAG, "Camera capture failed");
-        return ESP_FAIL;
-    }  
+esp_err_t GetESPImage(int image_width, int image_height, int channels, uint8_t* image_data) {
+    //if (xSemaphoreTake(web_send_mutex, portMAX_DELAY) == pdTRUE){
+        camera_fb_t* fb = esp_camera_fb_get();
+        if (!fb) {
+            ESP_LOGE(TAG, "Camera capture failed");
+            return ESP_FAIL;
+        }  
+    //     xSemaphoreGive(web_send_mutex);
+    //}
+#if RGBTYPE   ==     RGB888
 
     uint8_t *rgb888_buf = (uint8_t *)heap_caps_malloc(fb->width * fb->height * 3, MALLOC_CAP_SPIRAM);
     if(rgb888_buf == NULL)
@@ -104,10 +111,10 @@ esp_err_t GetImage(int image_width, int image_height, int channels, uint8_t* ima
         free(rgb888_buf);
         return ESP_FAIL;
     }
-     
+ #endif
     const int src_w = fb->width;
     const int src_h = fb->height;
-    const uint8_t* src = rgb888_buf;//fb->buf;
+    const uint8_t* src =fb->buf;// rgb888_buf;//fb->buf;
     for (int y = 0; y < image_height; ++y) {
         for (int x = 0; x < image_width; ++x) {
             // 最近邻采样：将 160x120 → 64x64
@@ -131,7 +138,9 @@ esp_err_t GetImage(int image_width, int image_height, int channels, uint8_t* ima
         }
     }   
     esp_camera_fb_return(fb);
+#if RGBTYPE   ==     RGB888
     free(rgb888_buf);  
+#endif
     size_t free_heap = esp_get_free_heap_size();
     printf("Free heap memory: %d bytes\n", free_heap);
   /* here the esp camera can give you grayscale image directly */

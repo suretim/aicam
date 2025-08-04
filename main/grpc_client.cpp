@@ -24,7 +24,7 @@
 #define MQTT_TOPIC "plant_health"
 
 // TFLite Micro 模型配置
-#define MODEL_PATH "/spiffs/model.tflite" // 你的 TFLite 模型路径
+//#define MODEL_PATH "/spiffs/model.tflite" // 你的 TFLite 模型路径
 //#define INPUT_SIZE 64 // 假设输入图像是 64x64
 #define MODEL_INPUT_SIZE 64
 

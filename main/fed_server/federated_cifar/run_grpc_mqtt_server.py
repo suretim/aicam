@@ -4,21 +4,22 @@ import model_pb2
 import model_pb2_grpc
 from concurrent import futures
 import time
+import datetime
 import json
+import threading
 
 # MQTT配置
 MQTT_BROKER = "192.168.0.57"
 GRPC_SERVER = "192.168.133.128:50051"
 MQTT_PORT = 1883
 MQTT_TOPIC = "federated_model/parameters"
+MQTT_PUBLISH = "capture/mqttx_"  # 替换为你的主题
+
 #Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
 #python -m venv .venv
 #.\.venv\Scripts\activate  # Windows PowerShell
 # 或 source .venv/bin/activate  # Linux/macOS
 
-# 创建 MQTT 客户端
-mqtt_client = mqtt.Client()
-#mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
 
 # python -m grpc_tools.protoc --proto_path=./ --python_out=./ --grpc_python_out=./ model.proto
 # start mqtt server D:\mqttserver\emqx-5.0.26-windows-amd64\bin\emqx.cmd
@@ -166,21 +167,24 @@ def on_message(client, userdata, msg):
         print(f"Unexpected error in on_message: {e}")
 
 
+# 创建 MQTT 客户端
+mqtt_client = mqtt.Client()
+# client = mqtt.Client()
+mqtt_client.on_connect = on_connect
+mqtt_client.on_message = on_message
+# 设置用户名和密码
+username = "tim"  # 替换为你的 MQTT 用户名
+password = "tim"  # 替换为你的 MQTT 密码
+mqtt_client.username_pw_set(username, password)  # 设置用户名和密码
+# 设置重连超时时间，单位为毫秒
+reconnect_timeout_ms = 10000  # 10秒的重连超时
+mqtt_client.reconnect_delay_set(min_delay=1, max_delay=10)  # 设置重连延迟（最小1秒，最大10秒）
+
+mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
+
+#mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
 
 def mqtt_subscribe():
-    #client = mqtt.Client()
-    mqtt_client.on_connect = on_connect
-    mqtt_client.on_message = on_message
-    # 设置用户名和密码
-    username = "tim"  # 替换为你的 MQTT 用户名
-    password = "tim"  # 替换为你的 MQTT 密码
-    mqtt_client.username_pw_set(username, password)  # 设置用户名和密码
-    # 设置重连超时时间，单位为毫秒
-    reconnect_timeout_ms = 10000  # 10秒的重连超时
-    mqtt_client.reconnect_delay_set(min_delay=1, max_delay=10)  # 设置重连延迟（最小1秒，最大10秒）
-
-    #client.connect("192.168.0.57", 1883, 60)  # 更换为实际的 MQTT broker 地址
-    mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
     mqtt_client.loop_start()
     # 让程序持续运行，以便接收和处理消息
     try:
@@ -190,7 +194,7 @@ def mqtt_subscribe():
         print("Disconnected from MQTT broker.")
         mqtt_client.loop_stop()
 
-def serve ():
+def serve0 ():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     model_pb2_grpc.add_FederatedLearningServicer_to_server(FederatedLearningServicer(), server)
     server.add_insecure_port('[::]:50051')
@@ -198,7 +202,7 @@ def serve ():
     server.start()
     server.wait_for_termination()
 
-def serve1 ():
+def serve():
     # 启动 gRPC 服务器
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     model_pb2_grpc.add_FederatedLearningServicer_to_server(FederatedLearningServicer(), server)
@@ -215,9 +219,48 @@ def serve1 ():
 
 
 
+
+def publish_message():
+    """每分钟发布消息的定时任务"""
+    while True:
+        # 生成带时间戳的消息
+        message = f"定时消息 @ {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        #message = f"weight/prams"
+
+        # 发布消息
+        result = mqtt_client.publish(MQTT_PUBLISH, message, qos=1)
+
+        # 检查发布状态
+        if result.rc == mqtt.MQTT_ERR_SUCCESS:
+            print(f"已发布: {message} → [{MQTT_PUBLISH}]")
+        else:
+            print(f"发布失败，错误码: {result.rc}")
+
+        # 等待60秒
+        time.sleep(180)
+
+
 if __name__ == '__main__':
-    # 启动 gRPC 服务器和 MQTT 客户端
-    from threading import Thread
-    thread = Thread(target=mqtt_subscribe)
-    thread.start()
-    serve()
+# 启动 gRPC 服务器和 MQTT 客户端
+
+    try:
+        #from threading import Thread
+        #thread = Thread(target=mqtt_subscribe)
+        subcribe_thread = threading.Thread(target=mqtt_subscribe)
+        subcribe_thread.start()
+
+        # 创建定时发布线程
+        publish_thread = threading.Thread(target=publish_message)
+        publish_thread.daemon = True  # 设为守护线程
+        publish_thread.start()
+
+        serve()
+
+    except KeyboardInterrupt:
+        print("\n程序终止")
+    except Exception as e:
+        print(f"发生错误: {str(e)}")
+    finally:
+        mqtt_client.disconnect()
+        mqtt_client.loop_stop()
+        print("MQTT连接已关闭")

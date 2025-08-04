@@ -1,4 +1,4 @@
-/* * Data converted from D:/tim/aicam/build/esp-idf/mbedtls/x509_crt_bundle
+/* * Data converted from C:/tim/aicam/build/esp-idf/mbedtls/x509_crt_bundle
  */
 .data
 .section .rodata.embedded

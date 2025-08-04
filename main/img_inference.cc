@@ -1,19 +1,14 @@
-//#include "run_inference.h"
-#include "model_data.h"  // TFLite 模型数据
-//#include "tensorflow/lite/micro/kernels/all_ops_resolver.h"
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/micro/micro_interpreter.h"
 #include "tensorflow/lite/micro/system_setup.h"
-#include "tensorflow/lite/schema/schema_generated.h"
-//#include "class_prototypes.h"
+#include "tensorflow/lite/schema/schema_generated.h" 
 //#include "sensor_module.h"  // 自定义传感器模块（相机、湿度、光感器）
 
-//#include "tensorflow/lite/version.h"
 #include <esp_task_wdt.h>
 #include "esp_camera.h" 
 #include "camera_config.h"
 #include "classifier.h"
-#include "mqtt_upload.h"
+#include "config_mqtt.h"
 #include "esp_log.h"
 
 #include "freertos/FreeRTOS.h"
@@ -40,7 +35,7 @@
 static const char *TAG = "Inference";
 
 
- extern      SemaphoreHandle_t web_send_mutex;
+ //extern      SemaphoreHandle_t web_send_mutex;
 
 
 // Globals, used for compatibility with Arduino-style sketches.
@@ -66,7 +61,7 @@ constexpr int scratchBufSize = 0;
 // Keeping allocation on bit larger size to accomodate future needs.
 //constexpr int kTensorArenaSize = 100 * 1024 + scratchBufSize;
 
-constexpr int kTensorArenaSize = 350 * 1024;   
+constexpr int kTensorArenaSize = 1024 * 1024;  
 static uint8_t *tensor_arena;//[kTensorArenaSize]; // Maybe we should move this to external
 }  // namespace
 
@@ -77,11 +72,14 @@ void reset_tensor(void)
   heap_caps_free(tensor_arena);
 }
 
+extern const unsigned char encoder_model_float[] asm("_binary_encoder_model_tflite_start");
 
 // The name of this function is important for Arduino compatibility.
 void setup() {
   // Map the model into a usable data structure. This doesn't involve any
   // copying or parsing, it's a very lightweight operation.
+
+  //encoder_model_float=asm("_binary_encoder_model_float_tflite_start"); 
   model = tflite::GetModel(encoder_model_float);
   if (model->version() != TFLITE_SCHEMA_VERSION) {
     MicroPrintf("Model provided is schema version %d not equal to supported "
@@ -109,12 +107,20 @@ void setup() {
   // NOLINTNEXTLINE(runtime-global-variables)
    
     //static tflite::MicroErrorReporter micro_error_reporter;
-    tflite::MicroMutableOpResolver<6> micro_op_resolver;
-    micro_op_resolver.AddConv2D();
+    tflite::MicroMutableOpResolver<4> micro_op_resolver;
+     micro_op_resolver.AddConv2D();
     micro_op_resolver.AddRelu();
     micro_op_resolver.AddMaxPool2D();
-    micro_op_resolver.AddAveragePool2D(); 
-    micro_op_resolver.AddReshape(); 
+    micro_op_resolver.AddAveragePool2D();
+
+    // Create the interpreter with the custom op resolver
+     
+    // tflite::MicroMutableOpResolver<6> micro_op_resolver;
+    // micro_op_resolver.AddConv2D();
+    // micro_op_resolver.AddRelu();
+    // micro_op_resolver.AddMaxPool2D();
+    // micro_op_resolver.AddAveragePool2D(); 
+    // micro_op_resolver.AddReshape(); 
   // Build an interpreter to run the model with.
   // NOLINTNEXTLINE(runtime-global-variables)
   static tflite::MicroInterpreter static_interpreter(
@@ -149,7 +155,7 @@ constexpr int kNumChannels = 1;
 // The name of this function is important for Arduino compatibility.
 void loop() {
   // Get image from provider.
-  if (kTfLiteOk != GetImage(kNumCols, kNumRows, kNumChannels, input->data.uint8)) {
+  if (kTfLiteOk != GetESPImage(kNumCols, kNumRows, kNumChannels, input->data.uint8)) {
     MicroPrintf("Image capture failed.");
     return;
   }
@@ -173,12 +179,12 @@ void tensor_server(void)
      while (true)
      {
       
-      if (xSemaphoreTake(web_send_mutex, portMAX_DELAY) == pdTRUE) {
+      //if (xSemaphoreTake(web_send_mutex, portMAX_DELAY) == pdTRUE) {
           if(get_tensor_state()){
             loop();
           }
-          xSemaphoreGive(web_send_mutex);
-      }
+      //    xSemaphoreGive(web_send_mutex);
+      //}
       // if(get_tensor_state()){
       //   loop();
       // }

@@ -8,8 +8,8 @@
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "esp_netif.h" 
-#include "mqtt_upload.h" 
-#include "wifi_config.h"
+#include "config_mqtt.h" 
+#include "config_wifi.h"
 static const char *TAG = "MAIN";
 
 #define WIFI_CONNECTED_BIT BIT0 

@@ -1,9 +1,13 @@
 dependencies:
-  esp-nn:
-    dependencies: []
+  espressif/esp-nn:
+    component_hash: 5d99b2991c109211ea5722bae481bbe243dc7e064d9ffd9e5dfa58aba7be9d88
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=4.2'
     source:
-      path: D:\tim\aicam\components\esp-nn
-      type: local
+      registry_url: https://components.espressif.com/
+      type: service
     version: 1.1.1
   idf:
     source:
@@ -12,6 +16,6 @@ dependencies:
 direct_dependencies:
 - espressif/esp-nn
 - idf
-manifest_hash: 561dd7b7467e6dcfe23b6d8bf10e1c8d8c6d18096310da44ab3847534395cb34
+manifest_hash: 5a1e7288476179d6b796dd307ab6e0f1a3aa517e82e7fba9203b6a55fc491969
 target: esp32s3
 version: 2.0.0
