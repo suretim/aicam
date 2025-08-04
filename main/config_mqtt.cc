@@ -37,7 +37,7 @@ void classifier_set_params(const float *weights, const float *bias, int input_di
     memcpy(g_weights, weights, sizeof(g_weights));
     memcpy(g_bias, bias, sizeof(g_bias));
 }
-void  get_mqtt_feature(const float *f_in)
+void  get_mqtt_feature(  float *f_in)
 {
     for (int i=0;i<EMBEDDING_DIM;i++)
     {
@@ -48,7 +48,7 @@ void  get_mqtt_feature(const float *f_in)
 
 
 // 将 float 数组格式化为 JSON 并上传
-void publish_feature_vector(  const char* topic ) {
+void publish_feature_vector( const   char* topic ) {
     std::stringstream ss;
     ss << "{\"weights\":[";
 

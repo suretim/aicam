@@ -11,9 +11,9 @@
 #include "mqtt_client.h"
 #include <esp_task_wdt.h>
 
-#include "config_mqtt.h"
 #include "img_inference.h"
-#include "camera_config.h"
+#include "config_mqtt.h"
+#include "config_camera.h"
 #include "config_wifi.h"  
 #include "classifier.h"
  
