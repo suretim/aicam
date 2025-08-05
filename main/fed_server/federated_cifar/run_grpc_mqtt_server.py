@@ -7,13 +7,19 @@ import time
 import datetime
 import json
 import threading
+import numpy as np
 
 # MQTT配置
-MQTT_BROKER = "192.168.0.57"
-GRPC_SERVER = "192.168.133.128:50051"
+#MQTT_BROKER = "192.168.0.57"
+MQTT_BROKER = "127.0.0.1"
+#GRPC_SERVER = "192.168.133.128:50051"
+GRPC_SERVER = "127.0.0.1:50051"
 MQTT_PORT = 1883
-MQTT_TOPIC = "federated_model/parameters"
-MQTT_PUBLISH = "capture/mqttx_"  # 替换为你的主题
+FEDER_PUBLISH = "federated_model/parameters"
+#MQTT_PUBLISH = "capture/mqttx_"  # 替换为你的主题
+#define MQTT_TOPIC_SUB "capture/mqttx_"
+
+GRPC_SUBSCRIBE = "grpc_sub/weights"
 
 #Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
 #python -m venv .venv
@@ -25,11 +31,29 @@ MQTT_PUBLISH = "capture/mqttx_"  # 替换为你的主题
 # start mqtt server D:\mqttserver\emqx-5.0.26-windows-amd64\bin\emqx.cmd
 model_params = []
 model_parameters_list = []
+new_model_parameters=[]
+
 # 用于更新模型的函数
 def publish_model_to_mqtt(model_parameters):
+    # 如果是 numpy 数组，先转成列表
+    if isinstance(model_parameters, np.ndarray):
+        model_parameters = model_parameters.tolist()
+    elif isinstance(model_parameters, list) and isinstance(model_parameters[0], np.ndarray):
+        model_parameters = [w.tolist() for w in model_parameters]
+
+    # 打包为 JSON 格式
+    weights_data = {
+        "weights": model_parameters,
+        # "metadata": {
+        #     "num_classes": 5,
+        #     "input_shape": 64
+        # }
+    }
     """通过 MQTT 发布全局模型参数"""
-    payload = json.dumps(model_parameters)  # 序列化为字符串
-    mqtt_client.publish(MQTT_TOPIC, payload)
+    payload = json.dumps(weights_data)  # 序列化为字符串
+
+
+    mqtt_client.publish(FEDER_PUBLISH, payload)
     print(f"Published model parameters to MQTT: {payload}")
 
 
@@ -130,7 +154,7 @@ def on_connect(client, userdata, flags, rc):
     if rc == 0:
         print("Connected to MQTT broker successfully!")
         # 连接成功后，订阅一个主题
-        client.subscribe("model/update")
+        client.subscribe(GRPC_SUBSCRIBE)
     else:
         print("Failed to connect, return code:", rc)
 
@@ -182,7 +206,6 @@ mqtt_client.reconnect_delay_set(min_delay=1, max_delay=10)  # 设置重连延迟
 
 mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
 
-#mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
 
 def mqtt_subscribe():
     mqtt_client.loop_start()
@@ -224,17 +247,17 @@ def publish_message():
     """每分钟发布消息的定时任务"""
     while True:
         # 生成带时间戳的消息
-        message = f"定时消息 @ {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        #message = f"weight/prams"
+        #message = f"定时消息 @ {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        #message = f"weight/mqtrx_"
 
         # 发布消息
-        result = mqtt_client.publish(MQTT_PUBLISH, message, qos=1)
-
+        #result = mqtt_client.publish(MQTT_PUBLISH, new_model_parameters, qos=1)
+        publish_model_to_mqtt(new_model_parameters)
         # 检查发布状态
-        if result.rc == mqtt.MQTT_ERR_SUCCESS:
-            print(f"已发布: {message} → [{MQTT_PUBLISH}]")
-        else:
-            print(f"发布失败，错误码: {result.rc}")
+        #if result.rc == mqtt.MQTT_ERR_SUCCESS:
+        #    print(f"已发布: {message} → [{MQTT_PUBLISH}]")
+        #else:
+        #    print(f"发布失败，错误码: {result.rc}")
 
         # 等待60秒
         time.sleep(180)
@@ -248,12 +271,12 @@ if __name__ == '__main__':
         #thread = Thread(target=mqtt_subscribe)
         subcribe_thread = threading.Thread(target=mqtt_subscribe)
         subcribe_thread.start()
-
+        '''
         # 创建定时发布线程
         publish_thread = threading.Thread(target=publish_message)
         publish_thread.daemon = True  # 设为守护线程
         publish_thread.start()
-
+        '''
         serve()
 
     except KeyboardInterrupt:

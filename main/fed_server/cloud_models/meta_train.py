@@ -3,7 +3,10 @@ import numpy as np
 #import matplotlib.pyplot as plt
 import os
 from tensorflow.keras import layers, models
-MQTT_BROKER = "192.168.0.57"
+
+
+#MQTT_BROKER = "192.168.0.57"
+MQTT_BROKER = "192.168.68.237"
 MQTT_PORT = 1883
 # Function: Convert some hex value into an array for C programming
 def hex_to_c_array(hex_data, var_name):

@@ -13,7 +13,7 @@ class EMQXServer:
         self.system = platform.system().lower()
         self.arch = "amd64" if platform.machine().endswith('64') else "386"
         #self.install_dir = os.path.join(os.getcwd(), f"emqx-{self.version}")
-        self.install_dir="c:\\emqt\\"
+        self.install_dir="d:\\emqt\\"
         self.install_dir = os.path.join(self.install_dir, f"emqx-{self.version}-windows-amd64\\")
         self.bin_path0 = os.path.join(self.install_dir, "bin", "emqx")
         self.conf_path = os.path.join(self.install_dir, "etc", "emqx.conf")

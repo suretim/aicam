@@ -11,16 +11,18 @@
 #define EMBEDDING_DIM 64
 #define TAG "MQTT"
 //#define MQTT_BROKER_URI "mqtt://192.168.133.128:1883"
-#if 1
+//#if 1
 #define MQTT_BROKER_URI "mqtt://192.168.68.237:1883"
-#else
-#define MQTT_BROKER_URI "mqtt://192.168.0.57:1883"
-#endif
+// #else
+// #define MQTT_BROKER_URI "mqtt://192.168.0.57:1883"
+//#endif
 #define MQTT_USERNAME "tim"
 #define MQTT_PASSWORD "tim"
 #define MQTT_CLIENT_ID_PREFIX "mqttx_" 
-#define MQTT_TOPIC_PUB "model/params"
-#define MQTT_TOPIC_SUB "capture/mqttx_"
+#define MQTT_TOPIC_PUB "grpc_sub/weights"
+//GRPC_SUBSCRIBE = "grpc_sub/weights"
+
+#define MQTT_TOPIC_SUB "federated_model/parameters"
 #define MQTT_KEEPALIVE_SECONDS 60
 
 
@@ -117,6 +119,7 @@ static esp_err_t mqtt_event_handler_cb(esp_mqtt_event_handle_t event) {
     case MQTT_EVENT_CONNECTED:
         ESP_LOGI(TAG, "MQTT connected");
         esp_mqtt_client_subscribe(event->client, MQTT_TOPIC_SUB, 1);
+        publish_feature_vector();
         break;
 
     case MQTT_EVENT_DATA: {
@@ -135,15 +138,15 @@ static esp_err_t mqtt_event_handler_cb(esp_mqtt_event_handle_t event) {
                 ESP_LOGI(TAG, "Parsed command: capture");
 
                 // 模拟响应：发布推理结果
-#if 1
+//#if 1
                 publish_feature_vector();
-#else
-                char json[128];
-                snprintf(json, sizeof(json),
-                        "{\"class\":\"%s\", \"confidence\":%.3f}",
-                        class_names[0], 0.5);
-                esp_mqtt_client_publish(event->client, MQTT_TOPIC_PUB, json, 0, 1, 0);
-#endif
+// #else
+//                 char json[128];
+//                 snprintf(json, sizeof(json),
+//                         "{\"class\":\"%s\", \"confidence\":%.3f}",
+//                         class_names[0], 0.5);
+//                 esp_mqtt_client_publish(event->client, MQTT_TOPIC_PUB, json, 0, 1, 0);
+// #endif
                 ESP_LOGI(TAG, "Sent capture response");
             } else {
                 ESP_LOGW(TAG, "Unknown or malformed command.");
@@ -169,10 +172,10 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
 }
 
 // ---------------- MQTT 发布推理结果 ----------------
-void mqtt_send_result(esp_mqtt_client_handle_t client, const char *payload) {
-    int msg_id = esp_mqtt_client_publish(client, MQTT_TOPIC_PUB, payload, 0, 1, 0);
-    ESP_LOGI("MQTT", "Published to %s: %s (msg_id=%d)", MQTT_TOPIC_PUB, payload, msg_id);
-}
+// void mqtt_send_result(esp_mqtt_client_handle_t client, const char *payload) {
+//     int msg_id = esp_mqtt_client_publish(client, MQTT_TOPIC_PUB, payload, 0, 1, 0);
+//     ESP_LOGI("MQTT", "Published to %s: %s (msg_id=%d)", MQTT_TOPIC_PUB, payload, msg_id);
+// }
 
   
 // ---------------- 启动 MQTT 客户端 ----------------
