@@ -43,23 +43,7 @@ def hex_to_c_array(hex_data, var_name):
 
     return c_str
 
-
-# ====================
-# 1. 构建轻量CNN特征提取器
-# ====================
-def build_encoder (input_shape=(64, 64, 3)):
-    model = tf.keras.Sequential([
-        layers.Conv2D(16, (3, 3), activation='relu', input_shape=(64, 64, 3)),
-        layers.MaxPooling2D(),
-        layers.Conv2D(32, (3, 3), activation='relu'),
-        layers.MaxPooling2D(),
-        layers.Conv2D(64, (3, 3), activation='relu'),
-        layers.AveragePooling2D(pool_size=(4, 4)),  # Replace mean operation
-        layers.Flatten(),
-        layers.Dense(64)
-    ])
-    return model
-def build_encoder0 (input_shape=(64, 64, 3)):
+def build_encoderx (input_shape=(64, 64, 3)):
     model = models.Sequential([
         layers.Conv2D(16, 3, activation='relu', padding='same'),
         layers.MaxPooling2D(),
@@ -72,11 +56,27 @@ def build_encoder0 (input_shape=(64, 64, 3)):
     ])
     return model
 
-encoder = build_encoder()
-dummy_input = tf.random.normal((1, 64, 64, 3))  # CIFAR-10 的 shape
-
-_ = encoder(dummy_input)  # 執行一次 forward
-encoder.summary()
+# ====================
+# 1. 构建轻量CNN特征提取器
+# ====================
+'''
+def build_encoder (input_shape=(64, 64, 3)):
+    model = tf.keras.Sequential([
+        layers.Conv2D(16, (3, 3), activation='relu', input_shape=(64, 64, 3)),
+        layers.MaxPooling2D(),
+        layers.Conv2D(32, (3, 3), activation='relu'),
+        layers.MaxPooling2D(),
+        layers.Conv2D(64, (3, 3), activation='relu'),
+        layers.AveragePooling2D(pool_size=(4, 4)),  # Replace mean operation
+        layers.Flatten(),
+        layers.Dense(64)
+    ])
+    return model
+'''
+encoder = build_encoderx()
+#dummy_input = tf.random.normal((1, 64, 64, 3))  # CIFAR-10 的 shape
+#_ = encoder(dummy_input)  # 執行一次 forward
+#encoder.summary()
 
 # ====================
 # 2. 加载图片数据（需自备）
@@ -97,6 +97,7 @@ def load_dataset(data_dir):
     )
 
 dataset = load_dataset("data")  # 替换为你的路径
+#testset = load_dataset("data")  # 替换为你的路径
 class_names = dataset.class_names
 print("Classes:", class_names)
 
@@ -119,7 +120,7 @@ def compute_prototypes(encoder, dataset):
         proto = embeddings[labels == label].mean(axis=0)
         prototypes[label] = proto
     return prototypes
-
+prototypes=compute_prototypes(encoder, dataset)
 # ====================
 # 4. 分类函数：计算距离
 # ====================
@@ -146,17 +147,23 @@ model.compile(optimizer='adam',
               loss='sparse_categorical_crossentropy',
               metrics=['accuracy'])
 
-model.fit(dataset, epochs=5)
+model.fit(dataset, epochs=20)
 
-
-
-
+encoder_model = model.layers[0]
+#encoder_model.predict(np.zeros((64, 64, 3)), np.zeros((64, 64, 3)))
+#predict_prototype(encoder_model, np.zeros((64, 64, 3)), prototypes)
+sample_image = tf.random.normal([1, 64, 64, 3])  # 示例输入
+embeddings = encoder_model.predict(sample_image)
+print("Embeddings shape:", embeddings.shape)
+prediction, distances = predict_prototype(encoder_model, sample_image[0], prototypes)
+print("Prediction:", prediction)
+c_model_name = 'encoder_model'
 
 # ====================
 # 6. 导出为 TensorFlow Lite 模型（部署用）
 # ====================
 # 去掉分类头，仅导出 encoder
-encoder.save("encoder_model.h5")
+encoder.save(c_model_name+".h5")
 
 #converter = tf.lite.TFLiteConverter.from_keras_model(encoder)
 #converter.optimizations = [tf.lite.Optimize.DEFAULT]  # 8-bit量化
@@ -178,37 +185,60 @@ converter.inference_output_type = tf.float32
 
 tflite_model = converter.convert()
 
-with open("encoder_model_float.tflite", "wb") as f:
+with open(c_model_name+".tflite", "wb") as f:
     f.write(tflite_model)
 
-
+'''
 # Write TFLite model to a C source (or header) file
-c_model_name = 'encoder_model_float'
 with open(c_model_name + '.h', 'w') as file:
     file.write(hex_to_c_array(tflite_model, c_model_name))
 
 # 获取所有的权重 tensor
 # 加载 tflite 模型
-interpreter = tf.lite.Interpreter(model_path="encoder_model_float.tflite")
+interpreter = tf.lite.Interpreter(model_path="encoder_model.tflite")
 interpreter.allocate_tensors()
 tensors = interpreter.get_tensor_details()
-weights = []
 
+weights = []
 for tensor in tensors:
     if 'weight' in tensor['name'].lower() or 'kernel' in tensor['name'].lower():
         data = interpreter.get_tensor(tensor['index'])
         weights.append(data.flatten())  # 展平为 1D
-
 # 合并所有参数为一个 list
+if not weights:
+    raise ValueError("No weights to concatenate. The list is empty.")
+weights = [np.array(w) if not isinstance(w, np.ndarray) else w for w in weights]
 flat_weights = np.concatenate(weights).tolist()
+
+#flat_weights = np.concatenate(weights).tolist()
 print(f"提取了 {len(flat_weights)} 个参数")
+'''
+import json
+import numpy as np
+
+# 获取分类头的权重和偏置
+dense_layer = model.layers[-1]  # 获取最后一层（分类头）
+weights, biases = dense_layer.get_weights()  # 权重矩阵和偏置向量
+
+# 转换为可JSON序列化的格式
+weights_data = {
+    "weights": weights.tolist(),  # 将numpy数组转为列表
+    "biases": biases.tolist(),
+    "metadata": {
+        "num_classes": len(class_names),
+        "input_shape": weights.shape[0]  # 输入特征维度
+    }
+}
+
+# 打包为JSON字符串
+json_payload = json.dumps(weights_data)
+print("JSON Payload Size:", len(json_payload), "bytes")
 
 
 import paho.mqtt.client as mqtt
-import json
 mqtt_client = mqtt.Client()
 
-def mqtt_subscribe():
+def mqtt_pub_metadata():
     #client = mqtt.Client()
     #mqtt_client.on_connect = on_connect
     #mqtt_client.on_message = on_message
@@ -233,9 +263,9 @@ def mqtt_subscribe():
 
     #client.connect("192.168.0.57", 1883)
 
-    message = json.dumps({"weights": flat_weights})
-    mqtt_client.publish("model/update", message)
-mqtt_subscribe()
+    #message = json.dumps({"weights": flat_weights})
+    mqtt_client.publish("dense_layer/metadata", json_payload)
+mqtt_pub_metadata()
 #with open("encoder_model.tflite", "wb") as f:
 #    f.write(tflite_model)
 

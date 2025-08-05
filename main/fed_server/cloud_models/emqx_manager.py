@@ -8,15 +8,17 @@ import tarfile
 
 
 class EMQXServer:
-    def __init__(self, version="5.6.1"):
+    def __init__(self, version="5.0.26"):
         self.version = version
         self.system = platform.system().lower()
         self.arch = "amd64" if platform.machine().endswith('64') else "386"
         #self.install_dir = os.path.join(os.getcwd(), f"emqx-{self.version}")
-        self.install_dir="d:\\emqx\\"
-        self.bin_path = os.path.join(self.install_dir, "bin", "emqx")
-
-        #self.bin_path = os.path.join(self.install_dir, "bin", "emqx")
+        self.install_dir="c:\\emqt\\"
+        self.install_dir = os.path.join(self.install_dir, f"emqx-{self.version}-windows-amd64\\")
+        self.bin_path0 = os.path.join(self.install_dir, "bin", "emqx")
+        self.conf_path = os.path.join(self.install_dir, "etc", "emqx.conf")
+        self.bin_path1 = self.bin_path0+" start -c "+self.conf_path
+        self.bin_path  = os.path.join(self.install_dir, "bin", "emqx")
 
     def download_emqx(self):
         base_url = "https://www.emqx.com/en/downloads/broker"
@@ -47,12 +49,12 @@ class EMQXServer:
 
     def start_server(self):
         if self.system == "windows":
-            command = f"{self.bin_path} start"
+            command = f"{self.bin_path1}"
         else:
             command = f"chmod +x {self.bin_path} && {self.bin_path} start"
 
         print("Starting EMQX server...")
-        print(emqx.bin_path)
+        print(self.bin_path1)
         subprocess.Popen(command, shell=True, cwd=self.install_dir)
 
         # Wait for startup
@@ -79,17 +81,18 @@ class EMQXServer:
 
 
 if __name__ == "__main__":
-    emqx = EMQXServer(version="5.6.1")  # 可修改版本号
+    emqx = EMQXServer(version="5.0.26")  # 可修改版本号
 
     #if not os.path.exists(emqx.install_dir):
     #    emqx.download_emqx()
 
     try:
         emqx.start_server()
+        time.sleep(1)
         print("Server is running" if emqx.check_status() else "Startup failed")
 
         # 保持运行直到用户中断
-        print("Press Ctrl+C to stop...")
+        print("netstat -ano | findstr :18083 Press Ctrl+C to stop...")
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
