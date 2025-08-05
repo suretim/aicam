@@ -43,7 +43,7 @@ def publish_model_to_mqtt(model_parameters):
 
     # 打包为 JSON 格式
     weights_data = {
-        "weights": model_parameters,
+        "mqtrx_weights": model_parameters,
         # "metadata": {
         #     "num_classes": 5,
         #     "input_shape": 64
