@@ -215,7 +215,7 @@ void start_mqtt_client (void) {
     esp_mqtt_client_register_event(mqtt_client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
     ESP_ERROR_CHECK(esp_mqtt_client_start(mqtt_client)); 
 }
-
+#if 0
 void mqtt_event_handler_cb(esp_mqtt_event_handle_t event) {
     switch (event->event_id) {
         case MQTT_EVENT_DATA:
@@ -238,3 +238,4 @@ void mqtt_event_handler_cb(esp_mqtt_event_handle_t event) {
             break;
     }
 }
+#endif
