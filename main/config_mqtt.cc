@@ -4,7 +4,8 @@
  #include <string>
 #include <sstream>
 #include <stdlib.h>
-//#include "mqtt_upload.h"
+#include "model_pb_handler.h"
+
 #include "classifier.h"
 //#define INFINITY 1000 
 #define NUM_CLASSES 2
@@ -131,7 +132,7 @@ static esp_err_t mqtt_event_handler_cb(esp_mqtt_event_handle_t event) {
         if (msg != NULL) {
             // 简单检查是否包含指令字段
             //if (strstr(msg, "\"capture\"") && strstr(msg, client_id)) {
-            if (strstr(msg, "\"mqtrx_\"") ) {
+            if (strstr(msg, "\"weights\"") ) {
                handle_mqtt_message( msg ); 
             }
             if (strstr(msg, "\"mqttx_\"") ) {
@@ -213,4 +214,27 @@ void start_mqtt_client (void) {
     #define ESP_EVENT_ANY_ID     ((esp_mqtt_event_id_t) -1)
     esp_mqtt_client_register_event(mqtt_client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
     ESP_ERROR_CHECK(esp_mqtt_client_start(mqtt_client)); 
+}
+
+void mqtt_event_handler_cb(esp_mqtt_event_handle_t event) {
+    switch (event->event_id) {
+        case MQTT_EVENT_DATA:
+            printf("MQTT payload received: topic=%.*s\n", event->topic_len, event->topic);
+            ParsedModelParams params;
+            if (decode_model_params((uint8_t *)event->data, event->data_len, &params)) {
+                printf("Received ParamType: %d\n", params.param_type);
+                printf("Client ID: %d\n", params.client_id);
+                printf("Values count: %d\n", params.value_count);
+
+                // 示例：若为分类头权重
+                if (params.param_type == CLASSIFIER_WEIGHT) {
+                    // 将 params.values 写入本地模型推理结构
+                    update_classifier_weights(params.values, params.value_count);
+                }
+            }
+            break;
+
+        default:
+            break;
+    }
 }
