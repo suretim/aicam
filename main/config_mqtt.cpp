@@ -11,12 +11,11 @@
 //#define NUM_CLASSES 2
 //#define EMBEDDING_DIM 64
 #define TAG "MQTT"
-#if 0
-#define MQTT_BROKER_URI "mqtt://192.168.133.129:1883"
-
-//#define MQTT_BROKER_URI "mqtt://192.168.68.237:1883"
- #else
-#define MQTT_BROKER_URI "mqtt://192.168.0.57:1883"
+#if 1
+    //#define MQTT_BROKER_URI "mqtt://192.168.133.129:1883"
+    #define MQTT_BROKER_URI "mqtt://192.168.68.237:1883"
+#else
+    #define MQTT_BROKER_URI "mqtt://192.168.0.57:1883"
 #endif
 #define MQTT_USERNAME "tim"
 #define MQTT_PASSWORD "tim"

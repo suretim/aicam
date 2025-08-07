@@ -19,9 +19,9 @@ payload = msg.SerializeToString()
 
 # 发布到 MQTT
 
-MQTT_BROKER = "192.168.0.57"
+#MQTT_BROKER = "192.168.0.57"
 #MQTT_BROKER = "192.168.68.237"
-#MQTT_BROKER = "127.0.0.1"
+MQTT_BROKER = "127.0.0.1"
 MQTT_PORT = 1883
 FEDER_PUBLISH = "federated_model/parameters"
 mqtt_client = mqtt.Client()
