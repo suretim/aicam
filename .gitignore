@@ -1,1 +1,6 @@
-/build/
+# Ignore generated protobuf C source/header files
+*.pb.c
+*.pb.h
+
+# Ignore build directory
+build/

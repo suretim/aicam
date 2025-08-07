@@ -1,42 +1,48 @@
-import flwr as fl
-import torch
-from torch.utils.data import DataLoader
-from utils import load_data, SimpleCNN
-from train import train, test
+import numpy as np
+import paho.mqtt.client as mqtt
+import model_pb2
+import json
 
-class CifarClient(fl.client.Client):
-    def __init__(self):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        trainset, testset = load_data()
-        self.trainloader = DataLoader(trainset, batch_size=32, shuffle=True)
-        self.testloader = DataLoader(testset, batch_size=32)
-        self.model = SimpleCNN().to(self.device)
+# 模拟你训练得到的权重
+# 构造假数据
+dense_weights = np.random.rand(64, 3).astype(np.float32)
 
-    def get_parameters(self, config):
-        # 返回一个包含 'parameters' 键的字典，解决错误
-        return {
-            "parameters": [val.cpu().numpy() for val in self.model.state_dict().values()]
-        }
+# 构建消息
+msg = model_pb2.ModelParams()
+msg.param_type = model_pb2.CLASSIFIER_WEIGHT
+msg.values.extend(dense_weights.flatten().tolist())
+msg.client_id = 1  # 可选设置 client_id
 
-    def set_parameters(self, parameters):
-        state_dict = self.model.state_dict()
-        for k, v in zip(state_dict.keys(), parameters["parameters"]):
-            state_dict[k] = torch.tensor(v)
-        self.model.load_state_dict(state_dict, strict=True)
+# 序列化消息
+payload = msg.SerializeToString()
+#json_payload = json.dumps(payload)
 
-    def fit(self, parameters, config):
-        self.set_parameters(parameters)
-        train(self.model, self.trainloader, epochs=1, device=self.device)
-        return self.get_parameters({}), len(self.trainloader.dataset), {}
+# 发布到 MQTT
 
-    def evaluate(self, parameters, config):
-        self.set_parameters(parameters)
-        loss, accuracy = test(self.model, self.testloader, device=self.device)
-        return float(loss), len(self.testloader.dataset), {"accuracy": float(accuracy)}
+MQTT_BROKER = "192.168.0.57"
+#MQTT_BROKER = "192.168.68.237"
+#MQTT_BROKER = "127.0.0.1"
+MQTT_PORT = 1883
+FEDER_PUBLISH = "federated_model/parameters"
+mqtt_client = mqtt.Client()
 
-def main():
-    client = CifarClient()
-    fl.client.start_client(server_address="localhost:8081", client=client)
+def mqtt_pub_metadata():
+    #client = mqtt.Client()
+    #mqtt_client.on_connect = on_connect
+    #mqtt_client.on_message = on_message
+    # 设置用户名和密码
+    username = "tim"  # 替换为你的 MQTT 用户名
+    password = "tim"  # 替换为你的 MQTT 密码
+    mqtt_client.username_pw_set(username, password)  # 设置用户名和密码
+    # 设置重连超时时间，单位为毫秒
+    reconnect_timeout_ms = 10000  # 10秒的重连超时
+    mqtt_client.reconnect_delay_set(min_delay=1, max_delay=10)  # 设置重连延迟（最小1秒，最大10秒）
 
-if __name__ == "__main__":
-    main()
+    mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)  # 更换为实际的 MQTT broker 地址
+
+    mqtt_client.publish(FEDER_PUBLISH, payload)
+    mqtt_client.disconnect()
+
+
+mqtt_pub_metadata()
+

@@ -10,4 +10,6 @@ typedef struct {
     int32_t client_id;
 } ParsedModelParams;
 
-bool decode_model_params(const uint8_t *payload, size_t length, ParsedModelParams *out_params);
+//bool decode_model_params(const uint8_t *payload, size_t length, ParsedModelParams *out_params);
+bool decode_model_params(  uint8_t *data, size_t len, ParsedModelParams *out_params) ;
+

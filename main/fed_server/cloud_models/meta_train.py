@@ -1,13 +1,17 @@
 import tensorflow as tf
 import numpy as np
 #import matplotlib.pyplot as plt
-import os
+#import os
 from tensorflow.keras import layers, models
+import json
+import paho.mqtt.client as mqtt
 
 
-#MQTT_BROKER = "192.168.0.57"
-MQTT_BROKER = "192.168.68.237"
+MQTT_BROKER = "192.168.0.57"
+#MQTT_BROKER = "192.168.68.237"
+#MQTT_BROKER = "127.0.0.1"
 MQTT_PORT = 1883
+FEDER_PUBLISH = "federated_model/parameters"
 # Function: Convert some hex value into an array for C programming
 def hex_to_c_array(hex_data, var_name):
 
@@ -100,7 +104,6 @@ def load_dataset(data_dir):
     )
 
 dataset = load_dataset("data")  # 替换为你的路径
-#testset = load_dataset("data")  # 替换为你的路径
 class_names = dataset.class_names
 print("Classes:", class_names)
 
@@ -166,7 +169,7 @@ c_model_name = 'encoder_model'
 # 6. 导出为 TensorFlow Lite 模型（部署用）
 # ====================
 # 去掉分类头，仅导出 encoder
-encoder.save(c_model_name+".h5")
+#encoder.save(c_model_name+".h5")
 
 #converter = tf.lite.TFLiteConverter.from_keras_model(encoder)
 #converter.optimizations = [tf.lite.Optimize.DEFAULT]  # 8-bit量化
@@ -216,8 +219,6 @@ flat_weights = np.concatenate(weights).tolist()
 #flat_weights = np.concatenate(weights).tolist()
 print(f"提取了 {len(flat_weights)} 个参数")
 '''
-import json
-import numpy as np
 
 # 获取分类头的权重和偏置
 dense_layer = model.layers[-1]  # 获取最后一层（分类头）
@@ -238,7 +239,6 @@ json_payload = json.dumps(weights_data)
 print("JSON Payload Size:", len(json_payload), "bytes")
 
 
-import paho.mqtt.client as mqtt
 mqtt_client = mqtt.Client()
 
 def mqtt_pub_metadata():
@@ -267,11 +267,8 @@ def mqtt_pub_metadata():
     #client.connect("192.168.0.57", 1883)
 
     #message = json.dumps({"weights": flat_weights})
-    mqtt_client.publish("dense_layer/metadata", json_payload)
+    mqtt_client.publish(FEDER_PUBLISH, json_payload)
 mqtt_pub_metadata()
-#with open("encoder_model.tflite", "wb") as f:
-#    f.write(tflite_model)
-
 
 # Write TFLite model to a C source (or header) file
 #c_model_name = 'encoder_model'

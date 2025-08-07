@@ -563,11 +563,11 @@ static esp_err_t index_handler(httpd_req_t *req) {
     httpd_resp_set_type(req, "text/html");
     return httpd_resp_send(req, index_socket_html_start, index_socket_html_end - index_socket_html_start);
 }
-static u_int8_t tensor_state=0;
-u_int8_t get_tensor_state(void)
-{
-   return tensor_state;
-}
+//static u_int8_t tensor_state=0;
+// u_int8_t get_tensor_state(void)
+// {
+//    return tensor_state;
+// }
 
 void video_stream_task(void *pvParameters) {
     static unsigned int frame_tmr = 0;
@@ -581,7 +581,7 @@ void video_stream_task(void *pvParameters) {
     frame_tmr = tick_get(); 
      
     while (1) {    
-        tensor_state=0;    
+        //tensor_state=0;    
         camera_fb_t *fb = esp_camera_fb_get();
         
         if (!fb) {
@@ -621,7 +621,7 @@ void video_stream_task(void *pvParameters) {
             }
             
             esp_camera_fb_return(fb);
-            tensor_state=1;
+            //tensor_state=1;
             vTaskDelay(pdMS_TO_TICKS(50));   //30
         }
         else
@@ -634,7 +634,7 @@ void video_stream_task(void *pvParameters) {
                 {
                     ESP_LOGE(TAG, "fmt2rgb888 failed, fb: %d", fb->len);
                     esp_camera_fb_return(fb);
-                    tensor_state=1;
+                    //tensor_state=1;
                     free(rgb888_buf);
                     res = ESP_FAIL;
                 }
@@ -664,7 +664,7 @@ void video_stream_task(void *pvParameters) {
                 _jpg_buf = NULL;                                                                                              //90        
                 bool jpeg_converted = fmt2jpg(rgb888_buf, fb->width * fb->height * 3, fb->width, fb->height, PIXFORMAT_RGB888, 60,  &_jpg_buf, &_jpg_buf_len);
                 esp_camera_fb_return(fb);
-                tensor_state=1;
+                //tensor_state=1;
                 free(rgb888_buf);
                 if (!jpeg_converted) {
                     ESP_LOGE(TAG, "JPEG compression failed");

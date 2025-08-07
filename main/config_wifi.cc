@@ -11,7 +11,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
-#if 0
+#if 1
   #define WIFI_SSID_STA      "1573"
   #define WIFI_PASS_STA      "987654321"
 #else
@@ -183,6 +183,7 @@ void wifi_init_apsta(void) {
     } else {
         ESP_LOGE(TAG, "连接失败！");
     }
+    
 }
   
  

@@ -42,7 +42,7 @@ extern "C" void app_main(void) {
     init_esp32_camera(); 
     start_esp32ap_webserver();  
     start_mqtt_client();
-    tensor_server();
+    tensor_run();
   //xTaskCreate(tensor_task, "tensor_task", 4096, NULL, 5, NULL);
 
 }
