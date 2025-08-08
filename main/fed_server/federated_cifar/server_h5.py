@@ -9,6 +9,7 @@ class ESP32TOH5:
         self.data_dir = Path(data_dir)
         self.device_id = device_id
 
+
     def save_esp32_features(self,
                             features: np.ndarray,
                             labels: np.ndarray,
@@ -31,15 +32,31 @@ class ESP32TOH5:
 
         # 保存到HDF5
         with h5py.File(filename, 'w') as f:
+            if features.ndim == 0:  # Scalar check
+                f.create_dataset("features", data=features)
+            else:
+                f.create_dataset("features", data=features, compression="gzip")
+
+            # Same for labels
+            if labels.ndim == 0:
+                f.create_dataset("labels", data=labels)
+            else:
+                f.create_dataset("labels", data=labels, compression="gzip")
+
+            # Save metadata (no compression)
+            #if metadata:
+            #    for key, value in metadata.items():
+            #        f.create_dataset(f"metadata/{key}", data=value)
+
             # 保存主要數據
-            f.create_dataset("features", data=features, compression="gzip", chunks=None)
-            f.create_dataset("labels", data=labels, compression="gzip", chunks=None)
+            #f.create_dataset("features", data=features, compression="gzip" )
+            #f.create_dataset("labels", data=labels, compression="gzip" )
 
             # 保存元數據
-            if metadata is None:
-                metadata = {}
+            #if metadata is None:
+            metadata = {}
             metadata.update({
-                "device_id": device_id,
+                "device_id": self.device_id,
                 "timestamp": timestamp,
                 "num_samples": len(features),
                 "feature_dim": features.shape[1]

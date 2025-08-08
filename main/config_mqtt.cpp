@@ -11,7 +11,7 @@
 //#define NUM_CLASSES 2
 //#define EMBEDDING_DIM 64
 #define TAG "MQTT"
-#if 0
+#if 1
     //#define MQTT_BROKER_URI "mqtt://192.168.133.129:1883"
     #define MQTT_BROKER_URI "mqtt://192.168.68.237:1883"
 #else
@@ -65,6 +65,7 @@ void publish_feature_vector(void) {
     std::string payload = ss.str();
 
     int msg_id = esp_mqtt_client_publish(mqtt_client, MQTT_TOPIC_PUB, payload.c_str(), payload.length(), 1, 0);
+      msg_id = esp_mqtt_client_publish(mqtt_client, MQTT_TOPIC_PUB, payload.c_str(), payload.length(), 1, 0);
     if (msg_id != -1) {
         ESP_LOGI("MQTT", "Published feature vector, msg_id=%d", msg_id);
     } else {

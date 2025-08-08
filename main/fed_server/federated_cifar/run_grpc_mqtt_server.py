@@ -10,8 +10,8 @@ import threading
 import numpy as np
 
 # MQTT配置
-MQTT_BROKER = "192.168.0.57"
-#MQTT_BROKER = "127.0.0.1"
+#MQTT_BROKER = "192.168.0.57"
+MQTT_BROKER = "127.0.0.1"
 #GRPC_SERVER = "192.168.133.128:50051"
 GRPC_SERVER = "127.0.0.1:50051"
 MQTT_PORT = 1883
@@ -93,6 +93,7 @@ from server_h5 import ESP32TOH5 as store_h5
 class FederatedLearningServicer(model_pb2_grpc.FederatedLearningServicer):
     def __init__(self):
         self.model_parameters_list = []
+        self.model_labels_list = []
     def UploadModelxParams0(self, request, context):
         # 模拟处理模型参数
         print(f"Received model params from client {request.client_id}")
@@ -141,6 +142,7 @@ class FederatedLearningServicer(model_pb2_grpc.FederatedLearningServicer):
 
         return avg_params
 
+
     def UploadModelParams(self, request, context):
         """
         更新全局模型并通过 MQTT 发布
@@ -148,30 +150,43 @@ class FederatedLearningServicer(model_pb2_grpc.FederatedLearningServicer):
         try:
             client_params = list(request.values)  # 需要转换为 list
             print("Received model parameters: ", client_params)
-            params_array = np.array(client_params, dtype=np.float32)  # Convert to NumPy array
+            # 使用示例
+            #params_array =np.random.rand(100, 64).astype(np.float32)  # 模擬ESP32輸出 client_params[1:64]  #
+            #labels_array = np.random.randint(0, 3, size=100) # 模擬ESP32輸出 client_params[0]  #
+            params_array = np.array(client_params[1:], dtype=np.float32)  # Convert to NumPy array
+            labels_array = np.array([ client_params[0]], dtype=np.float32)  # Convert to NumPy array
+
+            if params_array.shape[1] != self.model_parameters_list.shape[1]:
+                self.model_parameters_list = np.empty((0, 64))
+                self.model_labels_list = np.empty((0,))
+                #raise ValueError(
+                #    f"Expected {self.model_parameters_list.shape[1]} features, got {params_array.shape[1]}")
+            else:
+                # 使用np.vstack进行垂直堆叠
+                self.model_parameters_list = np.vstack((self.model_parameters_list, params_array))
+                self.model_labels_list = np.concatenate((self.model_labels_list, labels_array))
+
 
             # 聚合
-            self.model_parameters_list.append(params_array)
-            new_model_parameters = self.federated_avg(self.model_parameters_list)
-            print("federated_avg parameters: ", new_model_parameters)
-            data_dir = "data"
-            device_id = "client_002"
-            data_gen = store_h5(data_dir,device_id)
+            #self.model_parameters_list.append(params_array)
+            #self.model_labels_list.append(labels_array)
 
-            #data_gen.save_esp32_features(new_model_parameters,"1")
-            data_gen = store_h5(data_dir, device_id)
-            # 使用示例
-            features =new_model_parameters[1:]  # np.random.rand(100, 64).astype(np.float32)  # 模擬ESP32輸出
-            labels = new_model_parameters[0]   #np.random.randint(0, 3, size=100)
+            if self.model_parameters_list.shape[0]==2:
+                parameters_avg = self.federated_avg(self.model_parameters_list)
+                arravg = np.array(parameters_avg)
+                print("federated_avg parameters: ", arravg)
+                #features = np.round(features, decimals=3)  # Round to 1 decimal
+                #print("federated features: ", features)
 
-            data_gen.save_esp32_features(
-                features=features,
-                labels=labels,
-                metadata={
-                    "location": "lab_A",
-                    "sensor_type": "accelerometer_v2"
-                }
-            )
+                data_dir = "data"
+                device_id = "client_002"
+                data_gen = store_h5(data_dir,device_id)
+
+                data_gen.save_esp32_features(
+                    features=params_array,
+                    labels=labels_array
+                    #metadata={}
+                )
 
             # 发布新模型参数
             #publish_model_to_mqtt(new_model_parameters)
@@ -224,7 +239,7 @@ def on_message(client, userdata, msg):
         #fea_weights = message['fea_weights']  # 64维特征向量
         #fea_labels = message['fea_label'][0]  # 单个标签值(1)
         fea_vec = fea_weights.extend(fea_labels)
-        fea_vec=fea_weights+fea_labels
+        fea_vec= fea_labels+fea_weights
         print(f"Updated model parameters: {fea_vec}")
 
         if not isinstance(fea_vec, list):
@@ -236,7 +251,7 @@ def on_message(client, userdata, msg):
         stub = model_pb2_grpc.FederatedLearningStub(grpc_channel)
 
         # 构建 gRPC 请求
-        request = model_pb2.ModelParams(client_id=1, values= fea_vec[1:64] )
+        request = model_pb2.ModelParams(client_id=1, values= fea_vec)
 
         # 调用远程接口
         response = stub.UploadModelParams(request)
