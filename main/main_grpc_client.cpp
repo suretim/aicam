@@ -38,7 +38,7 @@ extern "C" void app_main(void) {
     ESP_ERROR_CHECK(ret);
   
     // init_tflite_model();
-    wifi_init_apsta();
+   wifi_init_apsta();
     init_esp32_camera(); 
     start_esp32ap_webserver();  
     start_mqtt_client();

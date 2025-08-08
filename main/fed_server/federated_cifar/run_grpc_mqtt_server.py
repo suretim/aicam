@@ -16,7 +16,7 @@ MQTT_BROKER = "192.168.0.57"
 GRPC_SERVER = "127.0.0.1:50051"
 MQTT_PORT = 1883
 FEDER_PUBLISH = "federated_model/parameters"
-#MQTT_PUBLISH = "capture/mqttx_"  # 替换为你的主题
+MSG_PUBLISH = "msg/mqttx_"  # 替换为你的主题
 #define MQTT_TOPIC_SUB "capture/mqttx_"
 
 GRPC_SUBSCRIBE = "grpc_sub/weights"
@@ -33,6 +33,27 @@ model_params = []
 model_parameters_list = []
 new_model_parameters=[]
 
+
+def publish_message():
+    """每分钟发布消息的定时任务"""
+    while True:
+        # 生成带时间戳的消息
+        message = f"定时消息 @ {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        #message = f"weight/mqtrx_"
+
+        # 发布消息
+        result = mqtt_client.publish(MSG_PUBLISH, message, qos=1)
+
+        # 检查发布状态
+        if result.rc == mqtt.MQTT_ERR_SUCCESS:
+            print(f"已发布: {message} → [{MQTT_PUBLISH}]")
+        else:
+            print(f"发布失败，错误码: {result.rc}")
+
+        # 等待60秒
+        time.sleep(180)
+
+
 # 用于更新模型的函数
 def publish_model_to_mqtt(model_parameters):
     # 如果是 numpy 数组，先转成列表
@@ -40,23 +61,34 @@ def publish_model_to_mqtt(model_parameters):
         model_parameters = model_parameters.tolist()
     elif isinstance(model_parameters, list) and isinstance(model_parameters[0], np.ndarray):
         model_parameters = [w.tolist() for w in model_parameters]
-
+    # 构建消息
+    msg_weights = model_pb2.ModelParams()
+    msg_weights.param_type = model_pb2.CLASSIFIER_WEIGHT
+    msg_weights.values.extend(model_parameters.flatten().tolist())
+    msg_weights.client_id = 1  # 可选设置 client_id
+    payload_weights = msg_weights.SerializeToString()
+    msg_bias = model_pb2.ModelParams()
+    msg_bias.param_type = model_pb2.CLASSIFIER_BIAS
+    msg_bias.values.extend(model_parameters.flatten().tolist())
+    msg_bias.client_id = 2  # 可选设置 client_id
+    payload_bias = msg_bias.SerializeToString()
     # 打包为 JSON 格式
-    weights_data = {
-        "mqtrx_weights": model_parameters,
+    #weights_data = {
+    #    "mqtrx_weights": model_parameters,
         # "metadata": {
         #     "num_classes": 5,
         #     "input_shape": 64
         # }
-    }
+    #}
     """通过 MQTT 发布全局模型参数"""
-    payload = json.dumps(weights_data)  # 序列化为字符串
+    #payload = json.dumps(weights_data)  # 序列化为字符串
 
 
-    mqtt_client.publish(FEDER_PUBLISH, payload)
-    print(f"Published model parameters to MQTT: {payload}")
+    mqtt_client.publish(FEDER_PUBLISH, payload_weights)
+    mqtt_client.publish(FEDER_PUBLISH, payload_bias)
+    print(f"Published model parameters to MQTT: {payload_bias}")
 
-
+from server_h5 import ESP32TOH5 as store_h5
 
 class FederatedLearningServicer(model_pb2_grpc.FederatedLearningServicer):
     def __init__(self):
@@ -114,16 +146,35 @@ class FederatedLearningServicer(model_pb2_grpc.FederatedLearningServicer):
         更新全局模型并通过 MQTT 发布
         """
         try:
-            client_params = list(request.weights)  # 需要转换为 list
+            client_params = list(request.values)  # 需要转换为 list
             print("Received model parameters: ", client_params)
-
-            self.model_parameters_list.append(client_params)
+            params_array = np.array(client_params, dtype=np.float32)  # Convert to NumPy array
 
             # 聚合
+            self.model_parameters_list.append(params_array)
             new_model_parameters = self.federated_avg(self.model_parameters_list)
+            print("federated_avg parameters: ", new_model_parameters)
+            data_dir = "data"
+            device_id = "client_002"
+            data_gen = store_h5(data_dir,device_id)
+
+            #data_gen.save_esp32_features(new_model_parameters,"1")
+            data_gen = store_h5(data_dir, device_id)
+            # 使用示例
+            features =new_model_parameters[1:]  # np.random.rand(100, 64).astype(np.float32)  # 模擬ESP32輸出
+            labels = new_model_parameters[0]   #np.random.randint(0, 3, size=100)
+
+            data_gen.save_esp32_features(
+                features=features,
+                labels=labels,
+                metadata={
+                    "location": "lab_A",
+                    "sensor_type": "accelerometer_v2"
+                }
+            )
 
             # 发布新模型参数
-            publish_model_to_mqtt(new_model_parameters)
+            #publish_model_to_mqtt(new_model_parameters)
             # 返回响应
             # return model_pb2.UpdateResponse(status="Success")
             success = True  # Let's assume the update is successful for this example
@@ -165,19 +216,27 @@ def on_message(client, userdata, msg):
     try:
         # 尝试解析 JSON 并提取参数
         message = json.loads(msg.payload.decode())
-        weights = message.get('weights')
+        fea_weights = message.get('fea_weights')
+        fea_labels = message.get('fea_label')
 
-        if not isinstance(weights, list):
-            raise ValueError("Invalid format: 'weights' must be a list")
 
-        print(f"Updated model parameters: {weights}")
+        # 提取特征权重和标签
+        #fea_weights = message['fea_weights']  # 64维特征向量
+        #fea_labels = message['fea_label'][0]  # 单个标签值(1)
+        fea_vec = fea_weights.extend(fea_labels)
+        fea_vec=fea_weights+fea_labels
+        print(f"Updated model parameters: {fea_vec}")
+
+        if not isinstance(fea_vec, list):
+            raise ValueError("Invalid format: 'fea_vec' must be a list")
+
 
         # 建立 gRPC 通信
         grpc_channel = grpc.insecure_channel(GRPC_SERVER)
         stub = model_pb2_grpc.FederatedLearningStub(grpc_channel)
 
         # 构建 gRPC 请求
-        request = model_pb2.ModelParams(client_id=1, weights=weights)
+        request = model_pb2.ModelParams(client_id=1, values= fea_vec[1:64] )
 
         # 调用远程接口
         response = stub.UploadModelParams(request)
@@ -240,27 +299,6 @@ def serve():
     except KeyboardInterrupt:
         server.stop(0)
 
-
-
-
-def publish_message():
-    """每分钟发布消息的定时任务"""
-    while True:
-        # 生成带时间戳的消息
-        #message = f"定时消息 @ {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        #message = f"weight/mqtrx_"
-
-        # 发布消息
-        #result = mqtt_client.publish(MQTT_PUBLISH, new_model_parameters, qos=1)
-        publish_model_to_mqtt(new_model_parameters)
-        # 检查发布状态
-        #if result.rc == mqtt.MQTT_ERR_SUCCESS:
-        #    print(f"已发布: {message} → [{MQTT_PUBLISH}]")
-        #else:
-        #    print(f"发布失败，错误码: {result.rc}")
-
-        # 等待60秒
-        time.sleep(180)
 
 
 if __name__ == '__main__':

@@ -11,7 +11,7 @@
 //#define NUM_CLASSES 2
 //#define EMBEDDING_DIM 64
 #define TAG "MQTT"
-#if 1
+#if 0
     //#define MQTT_BROKER_URI "mqtt://192.168.133.129:1883"
     #define MQTT_BROKER_URI "mqtt://192.168.68.237:1883"
 #else
@@ -49,12 +49,16 @@ void  get_mqtt_feature(  float *f_in)
 // 将 float 数组格式化为 JSON 并上传
 void publish_feature_vector(void) {
     std::stringstream ss;
-    ss << "{\"weights\":[";
+    int label=1;
+    ss << "{\"fea_weights\":[";
 
     for (int i = 0; i < DENSE_IN_FEATURES; ++i) {
         ss << f_out[i];
         if (i != DENSE_IN_FEATURES - 1) ss << ",";
     }
+    ss << "],";
+    ss << "\"fea_label\":[";     
+        ss << label; 
 
     ss << "]}";
 
@@ -133,7 +137,7 @@ void update_classifier_weights(const float* values, int value_count);
 void update_classifier_bais(const float* values, int value_count);
 
 
-#define MAX_BIAS_SIZE 16  // 根据你的模型类别数调整
+#define MAX_BIAS_SIZE 3  // 根据你的模型类别数调整
 
 // 全局偏置数组
 float classifier_bias[MAX_BIAS_SIZE];
@@ -151,10 +155,7 @@ void handle_classifier_bias(const float *values, size_t len) {
         classifier_bias[i] = values[i];
         ESP_LOGD(TAG, "bias[%d] = %f", (int)i, values[i]);
     }
-}
-
-
-
+} 
 
 void handle_classifier_weight(const float *values, size_t len, const int32_t *shape, size_t shape_len) {
     if (shape_len != 2) {
@@ -182,54 +183,7 @@ void handle_classifier_weight(const float *values, size_t len, const int32_t *sh
     }
 }
 
-
-   
-#if 0
-#include "pb.h"
-#include "pb_decode.h"
-#include "model.pb.h"  // 包含你生成的 message 类型定义
-
-// MQTT 回调函数（从 MQTT 订阅中触发）
-static void mqtt_event_handler_cb(esp_mqtt_event_handle_t event) {
-    switch (event->event_id) {
-        case MQTT_EVENT_DATA:
-            ESP_LOGI(TAG, "Received MQTT message: topic=%.*s", event->topic_len, event->topic);
-
-            // 解码 protobuf
-            ModelParams params = ModelParams_init_zero;
-            pb_istream_t stream = pb_istream_from_buffer((uint8_t*)event->data, event->data_len);
-
-            if (!pb_decode(&stream, ModelParams_fields, &params)) {
-                ESP_LOGE(TAG, "Failed to decode protobuf: %s", PB_GET_ERROR(&stream));
-                return;
-            }
-
-            // 处理参数类型
-            switch (params.param_type) {
-                case ParamType_CLASSIFIER_WEIGHT:
-                    ESP_LOGI(TAG, "Classifier weight received, values: %d", params.values_count);
-                    handle_classifier_weight(params.values, params.values_count, params.shape, params.shape_count);
-                    break;
-                case ParamType_CLASSIFIER_BIAS:
-                    ESP_LOGI(TAG, "Classifier bias received");
-                    handle_classifier_bias(params.values, params.values_count);
-                    break;
-                case ParamType_ENCODER_WEIGHT:
-                    ESP_LOGI(TAG, "Encoder weight received");
-                    break;
-                default:
-                    ESP_LOGW(TAG, "Unknown or unsupported param_type: %d", params.param_type);
-                    break;
-            }
-
-            break;
-        default:
-            break;
-    }
-}
-
-#endif
-
+ 
 
 static esp_err_t mqtt_event_handler_cb (esp_mqtt_event_handle_t event) {
     switch (event->event_id) {
@@ -237,7 +191,7 @@ static esp_err_t mqtt_event_handler_cb (esp_mqtt_event_handle_t event) {
             ESP_LOGI(TAG, "MQTT connected");
             //test_protobuf();
             esp_mqtt_client_subscribe(event->client, MQTT_TOPIC_SUB, 1);
-            //publish_feature_vector();
+            publish_feature_vector();
             break;
         case MQTT_EVENT_DATA:{
             
@@ -268,11 +222,12 @@ static esp_err_t mqtt_event_handler_cb (esp_mqtt_event_handle_t event) {
                     break;
                 case ParamType_CLASSIFIER_BIAS:
                     ESP_LOGI(TAG, "Classifier bias received");
-                    handle_classifier_bias(params.values, params.value_count);
+                    //handle_classifier_bias(params.values, params.value_count);
                     update_classifier_bias(params.values, params.value_count);
 
                     break;
                 case ParamType_ENCODER_WEIGHT:
+                    publish_feature_vector();
                     ESP_LOGI(TAG, "Encoder weight received");
                     break;
                 default:

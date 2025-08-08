@@ -221,7 +221,7 @@ static void update_statistics(unsigned int *frame_tmr, unsigned int *frame_cnt, 
         last_time = now;
     }
 }
-
+#if 1
 // 視頻流主任務
 void video_stream_task(void *pvParameters) {
     static unsigned int frame_tmr = xTaskGetTickCount();
@@ -295,9 +295,8 @@ void video_stream_task(void *pvParameters) {
 // u_int8_t get_tensor_state(void)
 // {
 //    return tensor_state;
-// }
-#if 0
-
+// } 
+#else
 void video_stream_task(void *pvParameters) {
     static unsigned int frame_tmr = 0;
     static unsigned int frame_cnt = 0;

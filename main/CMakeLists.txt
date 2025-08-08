@@ -9,7 +9,7 @@ set(PROTO_HDRS
 )
  
 
-if("${IDF_VERSION_MAJOR}.${IDF_VERSION_MINOR}" VERSION_GREATER  "5.0") 
+if(1) 
 #if("${IDF_VERSION_MAJOR}.${IDF_VERSION_MINOR}" VERSION_LESS  "5.0") 
 
 idf_component_register(
@@ -20,17 +20,22 @@ idf_component_register(
             "main_grpc_client.cpp" 
             "model_pb_handler.cc" 
             ${PROTO_SRCS} 
-            #"http_web.cpp" 
-            "config_stream.cpp" 
+            
+            "config_web.cpp" 
+            "config_wifi.cc" 
+                       
+            
+            #"cin_web.cc"
+            #"video_stream_optimized.cc"
+            #"websocket_optimized.cc"
+            #"wifi_optimized.cc"            
+            #"config_stream.cc" 
+
             "img_inference.cc" 
             "config_camera.cc" 
-            "config_wifi.cc" 
             "config_mqtt.cpp" 
             "classifier.cc" 
-            "cin_web.cc"
-            "video_stream_optimized.cc"
-            "websocket_optimized.cc"
-            "wifi_optimized.cc"
+            
         EMBED_FILES "web_content/index_http.html" "web_content/index_socket.html" "web_content/index_ecm.html" "encoder_model.tflite"
           
         #PRIV_REQUIRES mqtt nvs_flash esp_psram esp_http_server console esp_netif esp_http_server esp_wifi esp32-camera esp-tflite-micro esp_timer cjson lwip esp_eth driver

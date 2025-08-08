@@ -54,14 +54,21 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 #define WIFI_SSID_AP       "ESP32-AP"
 #define WIFI_PASS_AP       "12345678"
 // #define WIFI_CONNECTED_BIT BIT0
+static bool wifi_initialized = false;
+
 void wifi_init_sta_with_retry(const char* ssid, const char* password) {
     s_wifi_event_group = xEventGroupCreate();
 
     // 初始化NVS（必须）
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
 
+    if (!wifi_initialized) {
+        ESP_ERROR_CHECK(esp_event_loop_create_default());
+        // Other wifi init code
+        wifi_initialized = true;
+    }
+ 
     esp_netif_create_default_wifi_sta();
     esp_netif_create_default_wifi_ap();
 
@@ -161,7 +168,12 @@ void wifi_init_sta_with_retry0(const char* ssid, const char* password) {
 wifi_state_t get_wifi_state() {
     return s_wifi_state;
 }
-
+void wifi_deinit() {
+    esp_wifi_disconnect();
+    esp_wifi_stop();
+    esp_wifi_deinit();
+    esp_event_loop_delete_default();
+}
 void wifi_monitor_task(void *pvParameters) {
     while(1) {
         if(s_wifi_state == WIFI_STATE_CONNECTED) {

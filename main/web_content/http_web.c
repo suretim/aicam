@@ -748,7 +748,7 @@ static esp_err_t index_handler(httpd_req_t *req) {
     return httpd_resp_send(req, index_socket_html_start, index_socket_html_end - index_socket_html_start);
 }
 
-void video_stream_task(void *pvParameters) {
+void fast_stream_task(void *pvParameters) {
     static unsigned int frame_tmr = 0;
     static unsigned int frame_cnt = 0;
 

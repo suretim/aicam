@@ -14,17 +14,15 @@ static const char *TAG = "MAIN_APP";
   #define CONFIG_ESP_WIFI_SSID      "JD803"
  #define CONFIG_ESP_WIFI_PASSWORD      "18825213948"
 #endif
-
- 
-void start_esp32ap_webserver() {
+ void start_esp32ap_webserver() {
     // 初始化NVS
     esp_err_t ret = nvs_flash_init();
     if(ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
         ret = nvs_flash_init();
     }
-    ESP_ERROR_CHECK(ret);
-    
+    ESP_ERROR_CHECK(ret); 
+
     // 初始化WiFi
     wifi_init_sta_with_retry(CONFIG_ESP_WIFI_SSID, CONFIG_ESP_WIFI_PASSWORD);
     xTaskCreate(wifi_monitor_task, "wifi_monitor", 4096, NULL, 5, NULL);
