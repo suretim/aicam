@@ -30,7 +30,7 @@ GRPC_SUBSCRIBE = "grpc_sub/weights"
 # python -m grpc_tools.protoc --proto_path=./ --python_out=./ --grpc_python_out=./ model.proto
 # start mqtt server D:\mqttserver\emqx-5.0.26-windows-amd64\bin\emqx.cmd
 model_params = []
-model_parameters_list = []
+#model_parameters_list = []
 new_model_parameters=[]
 
 
@@ -46,7 +46,7 @@ def publish_message():
 
         # 检查发布状态
         if result.rc == mqtt.MQTT_ERR_SUCCESS:
-            print(f"已发布: {message} → [{MQTT_PUBLISH}]")
+            print(f"已发布: {message} → [{MSG_PUBLISH}]")
         else:
             print(f"发布失败，错误码: {result.rc}")
 
@@ -88,22 +88,14 @@ def publish_model_to_mqtt(model_parameters):
     mqtt_client.publish(FEDER_PUBLISH, payload_bias)
     print(f"Published model parameters to MQTT: {payload_bias}")
 
-from server_h5 import ESP32TOH5 as store_h5
+from DataSaver import DataSaver as data_saver
 
 class FederatedLearningServicer(model_pb2_grpc.FederatedLearningServicer):
     def __init__(self):
-        self.model_parameters_list = []
-        self.model_labels_list = []
-    def UploadModelxParams0(self, request, context):
-        # 模拟处理模型参数
-        print(f"Received model params from client {request.client_id}")
-        print(f"weights: {request.weights[:5]} ...")  # 只打印前5个 float 防止太长
-
-        return model_pb2.ServerResponse(
-            message="Model parameters successfully updated.",
-            update_successful=True,
-            update_timestamp=int(time.time())
-        )
+        #self.model_parameters_list = []
+        #self.model_labels_list = []
+        self.model_parameters_list = np.empty((0, 64))
+        self.model_labels_list = np.empty((0,))
 
     def GetUpdateStatus(self, request, context):
         # 假设总是成功并返回状态
@@ -148,46 +140,65 @@ class FederatedLearningServicer(model_pb2_grpc.FederatedLearningServicer):
         更新全局模型并通过 MQTT 发布
         """
         try:
-            client_params = list(request.values)  # 需要转换为 list
+            client_params = list(list(request.values) ) # 需要转换为 list
             print("Received model parameters: ", client_params)
+            print("request.values 類型:", type(request.values))
+            print("client_params 結構:", client_params)
+            print("第一行類型:", type(client_params[0]))
+            GROUP_SIZE = 66
+            num_groups = len(client_params) // GROUP_SIZE
+
+            # 转换为 NumPy 数组并重新组织
+            data = np.array(client_params, dtype=np.float32).reshape(num_groups, GROUP_SIZE)
+            labels_array = data[:, 0].astype(np.int32)  # 所有行的第 0 列（标签）
+            params_array = data[:, 1:65]  # 所有行的第 1 列之后（特征）
             # 使用示例
             #params_array =np.random.rand(100, 64).astype(np.float32)  # 模擬ESP32輸出 client_params[1:64]  #
             #labels_array = np.random.randint(0, 3, size=100) # 模擬ESP32輸出 client_params[0]  #
-            params_array = np.array(client_params[1:], dtype=np.float32)  # Convert to NumPy array
-            labels_array = np.array([ client_params[0]], dtype=np.float32)  # Convert to NumPy array
+            #params_array = np.array(client_params[1:], dtype=np.float32)  # Convert to NumPy array
+            #labels_array = np.array([ client_params[0]], dtype=np.float32)  # Convert to NumPy array
 
+            #labels_array = np.array([x[0] for x in client_params], dtype=np.int32)
+            # 提取所有行的第 1 列之后（特征）
+            #params_array = np.array([x[1:] for x in client_params], dtype=np.float32)
+            print("Received labels_array: ", labels_array)
+
+
+            # 初始化存储列表（如果是第一次运行）
+            if not hasattr(self, 'model_parameters_list'):
+                self.model_parameters_list = np.empty((0, 64))  # 特征维度 64
+                self.model_labels_list = np.empty((0,))  # 标签
+
+            # 检查维度一致性
             if params_array.shape[1] != self.model_parameters_list.shape[1]:
+                print(f"维度不匹配！重置存储列表。",params_array.shape[1] )
                 self.model_parameters_list = np.empty((0, 64))
                 self.model_labels_list = np.empty((0,))
-                #raise ValueError(
-                #    f"Expected {self.model_parameters_list.shape[1]} features, got {params_array.shape[1]}")
-            else:
-                # 使用np.vstack进行垂直堆叠
-                self.model_parameters_list = np.vstack((self.model_parameters_list, params_array))
-                self.model_labels_list = np.concatenate((self.model_labels_list, labels_array))
 
-
+            # 追加数据
+            self.model_parameters_list = np.vstack((self.model_parameters_list, params_array))
+            self.model_labels_list = np.concatenate((self.model_labels_list, labels_array))
             # 聚合
             #self.model_parameters_list.append(params_array)
             #self.model_labels_list.append(labels_array)
 
-            if self.model_parameters_list.shape[0]==2:
-                parameters_avg = self.federated_avg(self.model_parameters_list)
-                arravg = np.array(parameters_avg)
-                print("federated_avg parameters: ", arravg)
+            if self.model_parameters_list.shape[0]>=2:
+                #parameters_avg = self.federated_avg(self.model_parameters_list)
+                #arravg = np.array(parameters_avg)
+                #print("federated_avg parameters: ", arravg)
                 #features = np.round(features, decimals=3)  # Round to 1 decimal
                 #print("federated features: ", features)
 
-                data_dir = "data"
-                device_id = "client_002"
-                data_gen = store_h5(data_dir,device_id)
+                data_dir = "../../../../data"
+                device_id = "client_003"
+                data_gen = data_saver(data_dir,device_id)
 
-                data_gen.save_esp32_features(
+                data_gen.save_features(
                     features=params_array,
                     labels=labels_array
                     #metadata={}
                 )
-
+                print("Model parameters successfully updated." )
             # 发布新模型参数
             #publish_model_to_mqtt(new_model_parameters)
             # 返回响应

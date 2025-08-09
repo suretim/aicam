@@ -3,7 +3,7 @@ import tensorflow as tf
 from tensorflow import keras
 from pathlib import Path
 import h5py
-from my_load import MY_LOAD as loader
+from DataViewer import MY_LOAD as loader
 from flwr_pub import FLWR_PUB as publ
 from flwr.client import NumPyClient
 

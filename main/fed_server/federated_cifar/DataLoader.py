@@ -1,41 +1,54 @@
-
 import h5py
-import numpy as np
-import tensorflow as tf
-from tensorflow import keras
+import numpy as np 
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
-class MY_LOAD:
+
+
+class DataLoader:
     def __init__(self, data_dir, device_id=None):
         self.data_dir = Path(data_dir)
         self.device_id = device_id
 
-    def load_data(self):
+
+
+    def sumeray_files(self,data_dir):
+        files = list(Path(data_dir).glob("*.h5"))
+        # 檢查文件列表
+        print(f"找到 {len(files)} 個數據文件")
+        for file in files[:3]:  # 顯示前3個文件
+            print(file.name)
+    @staticmethod
+    def load_data(self,data_dir,device_id):
         # 查找該設備的所有數據文件
-        device_files = list(Path(self.data_dir).glob(f"{self.device_id}_*.h5"))
+        if device_id is None:
+            device_id = self.device_id
+        if data_dir is None:
+            data_dir = self.data_dir
+
+        device_files = list(Path(data_dir).glob(f"{device_id}_*.h5"))
 
         if not device_files:
-            raise FileNotFoundError(f"找不到設備 {self.device_id} 的數據")
+            raise FileNotFoundError(f"找不到設備 {device_id} 的數據")
 
         # 並行加載數據
-        features, labels = self._parallel_load(device_files)
+        features, labels = self.parallel_load(device_files)
         return features, labels
 
-    def _parallel_load(self,files, max_workers=4):
+    def parallel_load(self, files, max_workers=4):
 
         """並行加載多個文件"""
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             results = list(executor.map(
-                lambda f: self._load_and_preprocess_esp32_data(f.parent, f.stem.split("_")[0]),files
+                lambda f: self._load_and_preprocess_data(f.parent, f.stem.split("_")[0]), files
             ))
 
         features = np.concatenate([r[0] for r in results])
         labels = np.concatenate([r[1] for r in results])
         return features, labels
 
-    def _load_and_preprocess_esp32_data(self,data_dir: str,
-                                       client_id: str = None,
-                                       max_samples: int = None):
+    def _load_and_preprocess_data(self, data_dir: str,
+                                        client_id: str = None,
+                                        max_samples: int = None):
         """
         從目錄加載ESP32數據並預處理
         參數:
@@ -91,3 +104,13 @@ class MY_LOAD:
         labels = labels[shuffle_idx]
 
         return features, labels
+
+
+
+    def _find_data_files(self):
+        """查找匹配的数据文件"""
+        pattern = f"{self.device_id}_*.h5" if self.device_id else "*.h5"
+        files = list(self.data_dir.glob(pattern))
+        if not files:
+            raise FileNotFoundError(f"No data files found for {self.device_id}")
+        return files
