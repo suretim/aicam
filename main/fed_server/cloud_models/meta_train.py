@@ -6,11 +6,16 @@ from tensorflow.keras import layers, models
 import json
 import paho.mqtt.client as mqtt
 
-
+import model_pb2
+import model_pb2_grpc
+#C:\Users\Administrator\miniconda3\Library\bin\conda.bat
+#C:\Users\Administrator\miniconda3\Scripts\conda.exe
+#C:\Users\Administrator\miniconda3\condabin\conda.bat
 #conda activate my_env
 #cd C:\tim\aicam\main\fed_server\cloud_models
 #python emqx_manager.py
 #netstat -ano | findstr :18083
+
 #MQTT_BROKER = "192.168.0.57"
 MQTT_BROKER = "127.0.0.1"
 MQTT_PORT = 1883
@@ -226,6 +231,24 @@ print(f"提取了 {len(flat_weights)} 个参数")
 # 获取分类头的权重和偏置
 dense_layer = model.layers[-1]  # 获取最后一层（分类头）
 weights, biases = dense_layer.get_weights()  # 权重矩阵和偏置向量
+
+
+# 构建消息
+        msg_weights = model_pb2.ModelParams()
+        msg_weights.param_type = model_pb2.CLASSIFIER_WEIGHT
+        msg_weights.values.extend(weights.flatten().tolist())
+        msg_weights.client_id = client_id  # 可选设置 client_id
+        payload_weights = msg_weights.SerializeToString()
+        mqtt_client.publish(FEDER_PUBLISH, payload_weights)
+        print(f"Published model parameters to MQTT: {payload_weights}")
+        msg_bias = model_pb2.ModelParams()
+        msg_bias.param_type = model_pb2.CLASSIFIER_BIAS
+        msg_bias.values.extend(par2.flatten().tolist())
+        msg_bias.client_id = client_id  # 可选设置 client_id
+        payload_bias = msg_bias.SerializeToString()
+        mqtt_client.publish(FEDER_PUBLISH, payload_bias)
+
+
 
 # 转换为可JSON序列化的格式
 weights_data = {

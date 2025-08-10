@@ -252,6 +252,11 @@ static esp_err_t mqtt_event_handler_cb (esp_mqtt_event_handle_t event) {
                     break;
                 case ParamType_ENCODER_WEIGHT:
                     ESP_LOGI(TAG, "Encoder weight received");
+                    update_classifier_weights(params.values, params.value_count);
+                    break;
+                case ParamType_ENCODER_BIAS:
+                    ESP_LOGI(TAG, "Encoder bias received");
+                    update_classifier_bias(params.values, params.value_count);
                     break;
                 default:
                     ESP_LOGW(TAG, "Unknown or unsupported param_type: %d", params.param_type);

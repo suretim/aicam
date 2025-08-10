@@ -88,8 +88,12 @@ if __name__ == "__main__":
 
     try:
         emqx.start_server()
-        time.sleep(1)
-        print("Server is running" if emqx.check_status() else "Startup failed")
+        time.sleep(4)
+        if emqx.check_status():
+            print("Server is running")
+        else:
+            print("Server uncheck!!!")
+            emqx.stop_server()
 
         # 保持运行直到用户中断
         print("netstat -ano | findstr :18083 Press Ctrl+C to stop...")
