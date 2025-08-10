@@ -58,10 +58,10 @@ def hex_to_c_array(hex_data, var_name):
 
     return c_str
 class Meta_Train:
-    def __init__(self,data_dir=None,mqtt_client=None):
+    def __init__(self,dataset_dir=None,mqtt_client=None):
         #self.model_parameters_list = []
         #self.model_labels_list = []
-        self.data_dir = data_dir
+        self.dataset_dir = dataset_dir
         self.mqtt_client = mqtt_client
         self.model_parameters_list = np.empty((0, 64))
         self.model_labels_list = np.empty((0,))
@@ -84,9 +84,9 @@ class Meta_Train:
         return model
 
 
-    def load_dataset(self,dataset_dir):
+    def load_dataset(self,dataset_dir,img_size):
         return tf.keras.preprocessing.image_dataset_from_directory(
-            dataset_dir,
+            directory=dataset_dir,
             labels='inferred',
             label_mode='int',
             image_size=img_size,
@@ -180,8 +180,8 @@ GRPC_SUBSCRIBE = "grpc_sub/weights"
 if __name__ == '__main__':
     c_model_name = 'encoder_model'
 
-    data_dir = "../../../../data"
-    dataset_dir = "../cloud_models/data"
+    #data_dir = "../../../../data"
+    dataset_dir = "../cloud_models/data3"
     client_id=1
     mqtt_broker=MQTT_BROKER
     mqtt_port=MQTT_PORT
@@ -190,7 +190,7 @@ if __name__ == '__main__':
     password = "tim"  # 替换为你的 MQTT 密码
     mqtt_client = mqtt.Client()
     mqtt_server_init(mqtt_broker=mqtt_broker,mqtt_port=mqtt_port,username=username,password=password)
-    Meta_Train=Meta_Train(data_dir=data_dir,mqtt_client=mqtt_client)
+    Meta_Train=Meta_Train(dataset_dir=dataset_dir,mqtt_client=mqtt_client)
     encoder = Meta_Train.build_encoderx()
     # dummy_input = tf.random.normal((1, 64, 64, 3))  # CIFAR-10 的 shape
     # _ = encoder(dummy_input)  # 執行一次 forward
@@ -205,7 +205,7 @@ if __name__ == '__main__':
     #   └── disease/
     img_size = (64, 64)
 
-    dataset = Meta_Train.load_dataset(dataset_dir=dataset_dir)
+    dataset = Meta_Train.load_dataset(dataset_dir=dataset_dir,img_size=img_size)
     class_names = dataset.class_names
     print("Classes:", class_names)
 
