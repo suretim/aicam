@@ -18,6 +18,9 @@
   #define WIFI_SSID_STA      "JD803"
  #define WIFI_PASS_STA      "18825213948"
 #endif
+
+
+
 #define WIFI_SSID_AP       "ESP32-AP"
 #define WIFI_PASS_AP       "12345678"
  

@@ -6,9 +6,14 @@ from pathlib import Path
 import json
 from datetime import datetime
 from DataLoader import DataLoader as loader
+#import federated_cifar
 
-class DataPipeline:
-    def __init__(self,data_dir=None, data_loader=None):
+class LeamPipeline:
+    def __init__(self,data_dir=None, data_loader =None):
+        """
+
+        :type data_loader: DataLoader
+        """
         self.data_dir = data_dir
         self.data_loader = data_loader
         self.cache = {}  # 可選的緩存機制
@@ -146,7 +151,7 @@ if __name__ == '__main__':
     '''
     # 使用示例
     data_loader = loader(data_dir="..\..\..\..\data", device_id="client_001")
-    pipeline = DataPipeline(data_loader=data_loader)
+    pipeline = LeamPipeline(data_loader=data_loader)
     devices = pipeline.get_available_devices()
     federated_data = pipeline.get_federated_dataset(devices=devices, samples_per_device=500)
     target_device="client_002"

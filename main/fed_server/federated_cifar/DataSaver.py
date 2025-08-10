@@ -5,14 +5,22 @@ import json
 from datetime import datetime
 
 class DataSaver:
-    def __init__(self, data_dir, device_id=None):
-        self.data_dir = Path(data_dir)
+    def __init__(self, data_dir=None, device_id=None):
+        self.data_dir = data_dir
         self.device_id = device_id
+        if (data_dir is None):
+            self.data_dir = Path("data")
+        else:
+            self.data_dir = Path(data_dir)
+        if (device_id is None):
+            self.device_id ="esp32_001"
+        else:
+            self.device_id = device_id
 
         self.model_parameters_list = np.empty((0, 64))
         self.model_labels_list = np.empty((0,))
 
-    def UploadModelParams( self,request_values, context=None):
+    def t_UploadModelParams( self,request_values, context=None):
         """
         更新全局模型并通过 MQTT 发布
         """

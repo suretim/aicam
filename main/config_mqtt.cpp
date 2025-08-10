@@ -47,9 +47,10 @@ void  get_mqtt_feature(  float *f_in)
 
 
 // 将 float 数组格式化为 JSON 并上传
-void publish_feature_vector(void) {
+void publish_feature_vector(int label,int client_id ) {
     std::stringstream ss;
-    int label=1;
+    //int label=1;
+    //int client_id=1;
     ss << "{\"fea_weights\":[";
 
     for (int i = 0; i < DENSE_IN_FEATURES; ++i) {
@@ -60,7 +61,11 @@ void publish_feature_vector(void) {
     ss << "\"fea_label\":[";     
         ss << label; 
 
-    ss << "]}";
+    ss << "],";
+    ss << "\"client_id\":";     
+        ss << client_id; 
+
+    ss << "}";
 
     std::string payload = ss.str();
 
@@ -192,7 +197,7 @@ static esp_err_t mqtt_event_handler_cb (esp_mqtt_event_handle_t event) {
             ESP_LOGI(TAG, "MQTT connected");
             //test_protobuf();
             esp_mqtt_client_subscribe(event->client, MQTT_TOPIC_SUB, 1);
-            publish_feature_vector();
+            publish_feature_vector(1,8 );
             break;
         case MQTT_EVENT_DATA:{
             
@@ -228,7 +233,6 @@ static esp_err_t mqtt_event_handler_cb (esp_mqtt_event_handle_t event) {
 
                     break;
                 case ParamType_ENCODER_WEIGHT:
-                    publish_feature_vector();
                     ESP_LOGI(TAG, "Encoder weight received");
                     break;
                 default:
