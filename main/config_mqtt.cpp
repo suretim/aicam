@@ -5,6 +5,8 @@
 #include <stdlib.h> 
 #include "classifier.h"
 #include "cJSON.h"
+#include "esp_wifi.h"   
+#include <mbedtls/sha1.h>
 //#define INFINITY 1000 
 #define DENSE_IN_FEATURES 64
 #define DENSE_OUT_CLASSES 3
@@ -27,15 +29,14 @@
 #define MQTT_KEEPALIVE_SECONDS 120
 
 
-static esp_mqtt_client_handle_t mqtt_client = NULL;
-char client_id[64]=MQTT_CLIENT_ID_PREFIX;
- float  f_out[DENSE_IN_FEATURES ]= {
+static esp_mqtt_client_handle_t mqtt_client = NULL; 
+float  f_out[DENSE_IN_FEATURES ]= {
 0.2,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,
 0.2,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,
 0.2,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,
 0.2,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1
 };
-
+//char client_id[64]=MQTT_CLIENT_ID_PREFIX;
 void  get_mqtt_feature(  float *f_in)
 {
     for (int i=0;i<DENSE_IN_FEATURES;i++)
@@ -44,13 +45,25 @@ void  get_mqtt_feature(  float *f_in)
     }
    return  ;
 }
-
+uint32_t get_client_id()
+{
+    uint8_t mac[6];
+    esp_wifi_get_mac(WIFI_IF_STA, mac);
+      unsigned char hash[20]; // SHA-1 produces a 20-byte hash
+    mbedtls_sha1(mac, 6, hash);
+    uint32_t hashNumber = 0;
+  for(int i=0; i<4; i++) {
+    hashNumber = (hashNumber << 8) | hash[i];
+  }
+    return hashNumber;
+}
 
 // 将 float 数组格式化为 JSON 并上传
-void publish_feature_vector(int label,int client_id ) {
+void publish_feature_vector(int label ) {
     std::stringstream ss;
     //int label=1;
     //int client_id=1;
+   uint32_t  client_id=get_client_id();
     ss << "{\"fea_weights\":[";
 
     for (int i = 0; i < DENSE_IN_FEATURES; ++i) {
@@ -63,14 +76,14 @@ void publish_feature_vector(int label,int client_id ) {
 
     ss << "],";
     ss << "\"client_id\":";     
-        ss << client_id; 
+        ss << client_id ;
 
     ss << "}";
 
     std::string payload = ss.str();
 
     int msg_id = esp_mqtt_client_publish(mqtt_client, MQTT_TOPIC_PUB, payload.c_str(), payload.length(), 1, 0);
-      msg_id = esp_mqtt_client_publish(mqtt_client, MQTT_TOPIC_PUB, payload.c_str(), payload.length(), 1, 0);
+      
     if (msg_id != -1) {
         ESP_LOGI("MQTT", "Published feature vector, msg_id=%d", msg_id);
     } else {
@@ -80,8 +93,7 @@ void publish_feature_vector(int label,int client_id ) {
 }
 
 
-#if 1
-#include "model_pb_handler.h"
+#if 0
 int test_protobuf() {
     // 模拟收到 protobuf 编码的数据（你实际中来自 MQTT）
     // 建议使用 Python 端生成真实数据更方便
@@ -138,9 +150,6 @@ int test_protobuf() {
 //     int32_t client_id;
 // } ParsedModelParams;
 
- 
-void update_classifier_weights(const float* values, int value_count);
-void update_classifier_bais(const float* values, int value_count);
 
 
 #define MAX_BIAS_SIZE 3  // 根据你的模型类别数调整
@@ -190,6 +199,15 @@ void handle_classifier_weight(const float *values, size_t len, const int32_t *sh
 }
 
  
+#endif
+
+#if 1
+ #include "model_pb_handler.h"
+
+void update_classifier_weights(const float* values, int value_count);
+void update_classifier_bais(const float* values, int value_count);
+
+
 
 static esp_err_t mqtt_event_handler_cb (esp_mqtt_event_handle_t event) {
     switch (event->event_id) {
@@ -197,7 +215,7 @@ static esp_err_t mqtt_event_handler_cb (esp_mqtt_event_handle_t event) {
             ESP_LOGI(TAG, "MQTT connected");
             //test_protobuf();
             esp_mqtt_client_subscribe(event->client, MQTT_TOPIC_SUB, 1);
-            publish_feature_vector(1,8 );
+            publish_feature_vector(1);
             break;
         case MQTT_EVENT_DATA:{
             
@@ -367,7 +385,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
 // ---------------- 启动 MQTT 客户端 ----------------
 void start_mqtt_client (void) { 
     // 构造唯一 client_id，例如：leaf_detector_1234s
-    
+       char client_id[64];
     snprintf(client_id, sizeof(client_id), MQTT_CLIENT_ID_PREFIX "%ld", random() % 10000);
     //snprintf(client_id, sizeof(client_id), "mqttx_fefb0396");
     

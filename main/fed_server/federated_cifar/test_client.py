@@ -3,9 +3,9 @@ import tensorflow as tf
 from tensorflow import keras
 from pathlib import Path
 import h5py
-from DataViewer import MY_LOAD as loader
 from flwr_pub import FLWR_PUB as publ
 from flwr.client import NumPyClient
+from utils import DataLoader
 
 # 加载简单模型
 class ESP32Client(NumPyClient):
@@ -140,7 +140,7 @@ model = create_model()
 # 获取初始参数
 initial_params = [param.numpy() for param in  model.trainable_variables]
 # 创建数据加载器
-data_loader = loader( data_dir="data",device_id="esp32_001" )
+data_loader = DataLoader( data_dir="data",device_id="esp32_001" )
 
 # 2. 创建客户端
 client = ESP32Client( data_dir="data",device_id="esp32_001",model=model, data_loader=data_loader)

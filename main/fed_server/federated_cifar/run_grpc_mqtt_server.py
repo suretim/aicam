@@ -319,7 +319,6 @@ def serve(data_dir,mqtt_client):
 # MQTT配置
 #MQTT_BROKER = "192.168.0.57"
 MQTT_BROKER = "127.0.0.1"
-#GRPC_SERVER = "192.168.133.128:50051"
 GRPC_SERVER = "127.0.0.1:50051"
 MQTT_PORT = 1883
 FEDER_PUBLISH = "federated_model/parameters"

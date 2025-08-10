@@ -7,9 +7,12 @@ import json
 import paho.mqtt.client as mqtt
 
 
-MQTT_BROKER = "192.168.0.57"
-#MQTT_BROKER = "192.168.68.237"
-#MQTT_BROKER = "127.0.0.1"
+#conda activate my_env
+#cd C:\tim\aicam\main\fed_server\cloud_models
+#python emqx_manager.py
+#netstat -ano | findstr :18083
+#MQTT_BROKER = "192.168.0.57"
+MQTT_BROKER = "127.0.0.1"
 MQTT_PORT = 1883
 FEDER_PUBLISH = "federated_model/parameters"
 # Function: Convert some hex value into an array for C programming

@@ -57,7 +57,7 @@ static float softmax(float x[], int len, int *out_index) {
     if (out_index) *out_index = max_idx;
     return max_prob;
 }
-
+void publish_feature_vector(int label );
 int classifier_predict(const float *features) {
     float logits[CLASSIFIER_OUTPUT_DIM] = {0};
     for (int i = 0; i < CLASSIFIER_OUTPUT_DIM; ++i) {
@@ -69,6 +69,7 @@ int classifier_predict(const float *features) {
 
     int predicted_class = 0;
     softmax(logits, CLASSIFIER_OUTPUT_DIM, &predicted_class);
+    publish_feature_vector(predicted_class);
     return predicted_class;
 } 
  
