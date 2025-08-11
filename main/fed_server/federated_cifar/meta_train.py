@@ -4,10 +4,10 @@ import numpy as np
 #import os
 from tensorflow.keras import layers, models
 import json
-import paho.mqtt.client as mqtt
+#import paho.mqtt.client as mqtt
 
-import model_pb2
-import model_pb2_grpc
+#import model_pb2
+#import model_pb2_grpc
 #C:\Users\Administrator\miniconda3\Library\bin\conda.bat
 #C:\Users\Administrator\miniconda3\Scripts\conda.exe
 #C:\Users\Administrator\miniconda3\condabin\conda.bat
@@ -58,11 +58,10 @@ def hex_to_c_array(hex_data, var_name):
 
     return c_str
 class Meta_Train:
-    def __init__(self,dataset_dir=None,mqtt_client=None):
+    def __init__(self,dataset_dir=None ):
         #self.model_parameters_list = []
         #self.model_labels_list = []
         self.dataset_dir = dataset_dir
-        self.mqtt_client = mqtt_client
         self.model_parameters_list = np.empty((0, 64))
         self.model_labels_list = np.empty((0,))
         self.client_id=None
@@ -181,28 +180,25 @@ if __name__ == '__main__':
     c_model_name = 'encoder_model'
 
     #data_dir = "../../../../data"
-    dataset_dir = "../cloud_models/data3"
+    dataset_dir = "../../../../dataset/data3"
     client_id=1
     mqtt_broker=MQTT_BROKER
     mqtt_port=MQTT_PORT
     # 设置用户名和密码
     username = "tim"  # 替换为你的 MQTT 用户名
     password = "tim"  # 替换为你的 MQTT 密码
-    mqtt_client = mqtt.Client()
-    mqtt_server_init(mqtt_broker=mqtt_broker,mqtt_port=mqtt_port,username=username,password=password)
-    Meta_Train=Meta_Train(dataset_dir=dataset_dir,mqtt_client=mqtt_client)
+    #mqtt_client = mqtt.Client()
+    #mqtt_server_init(mqtt_broker=mqtt_broker,mqtt_port=mqtt_port,username=username,password=password)
+    Meta_Train=Meta_Train(dataset_dir=dataset_dir )
     encoder = Meta_Train.build_encoderx()
     # dummy_input = tf.random.normal((1, 64, 64, 3))  # CIFAR-10 的 shape
     # _ = encoder(dummy_input)  # 執行一次 forward
     # encoder.summary()
-
-    # ====================
-    # 2. 加载图片数据（需自备）
-    # ====================
-    # 假设你有两类图片在以下目录：
+    # 假设你有3类图片在以下目录：
     # data/
-    #   └── healthy/
-    #   └── disease/
+    #   └── h/
+    #   └── d/
+    #   └── w/
     img_size = (64, 64)
 
     dataset = Meta_Train.load_dataset(dataset_dir=dataset_dir,img_size=img_size)
@@ -229,41 +225,21 @@ if __name__ == '__main__':
     #print("Prediction:", prediction)
 
 
-
-    # 获取分类头的权重和偏置
-    dense_layer = model_encoder_dense.layers[-1]  # 获取最后一层（分类头）
-    weights, biases = dense_layer.get_weights()  # 权重矩阵和偏置向量
-
-    # 构建消息
-    msg_weights = model_pb2.ModelParams()
-    msg_weights.param_type = model_pb2.ENCODER_WEIGHT
-    msg_weights.values.extend(weights.flatten().tolist())
-    msg_weights.client_id = client_id  # 可选设置 client_id
-    payload_weights = msg_weights.SerializeToString()
-    mqtt_client.publish(FEDER_PUBLISH, payload_weights)
-    print(f"Published model parameters to MQTT: {payload_weights}")
-    msg_bias = model_pb2.ModelParams()
-    msg_bias.param_type = model_pb2.ENCODER_BIAS
-    msg_bias.values.extend(biases.flatten().tolist())
-    msg_bias.client_id = client_id  # 可选设置 client_id
-    payload_bias = msg_bias.SerializeToString()
-    mqtt_client.publish(FEDER_PUBLISH, payload_bias)
-
-    # 转换为可JSON序列化的格式
-    #weights_data = {
-    #    "weights": weights.tolist(),  # 将numpy数组转为列表
-    #    "biases": biases.tolist(),
-    #    "metadata": {
-    #        "num_classes": len(class_names),
-    #        "input_shape": weights.shape[0]  # 输入特征维度
-    #    }
-    #}
-
-    # 打包为JSON字符串
-    #json_payload = json.dumps(weights_data)
-    #print("JSON Payload Size:", len(json_payload), "bytes")
-
-# Write TFLite model to a C source (or header) file
-#c_model_name = 'encoder_model'
-#with open(c_model_name + '.h', 'w') as file:
-#    file.write(hex_to_c_array(tflite_model, c_model_name))
+    if False:
+        # 获取分类头的权重和偏置
+        dense_layer = model_encoder_dense.layers[-1]  # 获取最后一层（分类头）
+        weights, biases = dense_layer.get_weights()  # 权重矩阵和偏置向量
+        # 构建消息
+        msg_weights = model_pb2.ModelParams()
+        msg_weights.param_type = model_pb2.ENCODER_WEIGHT
+        msg_weights.values.extend(weights.flatten().tolist())
+        msg_weights.client_id = client_id  # 可选设置 client_id
+        payload_weights = msg_weights.SerializeToString()
+        mqtt_client.publish(FEDER_PUBLISH, payload_weights)
+        print(f"Published model parameters to MQTT: {payload_weights}")
+        msg_bias = model_pb2.ModelParams()
+        msg_bias.param_type = model_pb2.ENCODER_BIAS
+        msg_bias.values.extend(biases.flatten().tolist())
+        msg_bias.client_id = client_id  # 可选设置 client_id
+        payload_bias = msg_bias.SerializeToString()
+        mqtt_client.publish(FEDER_PUBLISH, payload_bias)

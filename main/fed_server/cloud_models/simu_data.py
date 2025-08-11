@@ -5,8 +5,8 @@ from tqdm import tqdm
 #pip install Pillow
 
 # 参数设置
-output_dir = "data3"
-categories = ["healthy", "wu", "disease"]
+output_dir = "../../../../dataset/general_h_d_data3"
+categories = ["h", "wu", "d"]
 img_size = (64, 64)
 num_images = 100  # 每类生成100张
 
