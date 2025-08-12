@@ -272,8 +272,8 @@ return kTfLiteOk;
 }
 
 
-u_int8_t get_tensor_state(void);
-void tensor_server(void) 
+//u_int8_t get_tensor_state(void);
+void tensor_run(void) 
 {
 
     //  if(kTfLiteError== setup())
@@ -302,7 +302,7 @@ void tensor_server(void)
 }
 void tensor_task(void *arg)
 {
-   // esp_task_wdt_add(NULL);  // 注册到 watchdog 
+    esp_task_wdt_add(NULL);  // 注册到 watchdog 
    
      while (true) {
         if(kTfLiteError== setup())

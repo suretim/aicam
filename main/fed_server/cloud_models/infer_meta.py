@@ -20,8 +20,8 @@ def compute_prototypes(encoder, dataset):
     labels = np.concatenate(labels)
     prototypes = {}
     for label in np.unique(labels):
-        proto = embeddings[labels == label].mean(axis=0)
-        prototypes[label] = proto
+        proto_means = embeddings[labels == label].mean(axis=0)
+        prototypes[label] = proto_means
     return prototypes
 
 # 定义原型推理函数

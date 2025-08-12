@@ -38,11 +38,11 @@ extern "C" void app_main(void) {
     ESP_ERROR_CHECK(ret);
   
     // init_tflite_model();
-    wifi_init_apsta();
+   wifi_init_apsta();
     init_esp32_camera(); 
     start_esp32ap_webserver();  
     start_mqtt_client();
-    tensor_server();
+    tensor_run();
   //xTaskCreate(tensor_task, "tensor_task", 4096, NULL, 5, NULL);
 
 }

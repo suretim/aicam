@@ -18,13 +18,12 @@
   #define WIFI_SSID_STA      "JD803"
  #define WIFI_PASS_STA      "18825213948"
 #endif
+
+
+
 #define WIFI_SSID_AP       "ESP32-AP"
 #define WIFI_PASS_AP       "12345678"
  
-#define c_wifi_cfg_ap           0
-#define c_wifi_cfg_sta          1
-#define c_wifi_cfg              c_wifi_cfg_ap
-
  
 static EventGroupHandle_t wifi_event_group;
 static EventGroupHandle_t s_wifi_event_group;
@@ -183,6 +182,7 @@ void wifi_init_apsta(void) {
     } else {
         ESP_LOGE(TAG, "连接失败！");
     }
+    
 }
   
  
