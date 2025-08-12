@@ -10,7 +10,7 @@ print("TensorFlow version:", tf.__version__)  # 确认版本为2.12+
 # 数据配置
 BATCH_SIZE = 32
 IMG_SIZE = (224, 224)
-EPOCHS = 2
+EPOCHS = 1
 categories = ["y", "w", "n"]  # 假设的类别
 
 # 转换为绝对路径
@@ -108,11 +108,30 @@ model.summary()
 
 
 # 编译模型
+#model.compile(
+#    optimizer=tf.keras.optimizers.Adam(1e-4),
+#    loss='categorical_crossentropy',
+#    metrics=['accuracy']
+#)
+# 编译模型（定义优化器、损失和指标）
 model.compile(
-    optimizer=tf.keras.optimizers.Adam(1e-4),
+    optimizer='adam',
     loss='categorical_crossentropy',
     metrics=['accuracy']
 )
+
+# 用一批假数据跑一次，触发 trace
+
+dummy_x = np.random.rand(1, IMG_SIZE[0], IMG_SIZE[1], 3).astype(np.float32)
+dummy_y = np.zeros((1, len(categories)), dtype=np.float32)
+dummy_y[0, 0] = 1  # 假标签
+model.train_on_batch(dummy_x, dummy_y)
+
+# 再保存
+model.save("saved_model_best")
+print(f"\n数据加载成功！类别对应关系: {train_data.class_indices}")
+
+
 
 
 callbacks = [
@@ -122,11 +141,11 @@ callbacks = [
         restore_best_weights=True
     ),
     tf.keras.callbacks.ModelCheckpoint(
-        'best_model.h5 ',  # or .tf
+        'best_model.tf',  # or .tf
         save_best_only=True,
         monitor='val_loss',  # 与EarlyStopping一致
-        mode='min',         # 监控指标的方向（min表示损失越小越好）
-        overwrite=True      # 解决HDF5文件冲突的关键！
+        mode='min'          # 监控指标的方向（min表示损失越小越好）
+        #overwrite=True      # 解决HDF5文件冲突的关键！
     )
 ]
 
@@ -134,12 +153,12 @@ callbacks = [
 print("\n开始训练...")
 history = model.fit(
     train_data,
-    epochs=EPOCHS,
-    validation_data=val_data,
-    callbacks=callbacks
+    epochs=EPOCHS
+    #validation_data=val_data
+    #callbacks=callbacks
 )
-keras_model = tf.keras.models.load_model('best_model.tf')
-converter = tf.lite.TFLiteConverter.from_keras_model(keras_model)
+#keras_model = tf.keras.models.load_model('best_model.tf')
+converter = tf.lite.TFLiteConverter.from_keras_model(model)
 tflite_model = converter.convert()
 with open('model.tflite', 'wb') as f:
     f.write(tflite_model)
