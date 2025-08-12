@@ -1,9 +1,14 @@
 import tensorflow as tf
 
 
-
-#conda create --prefix E:\path\to\envs\tf_hub_env python=3.10
-#conda env create -f environment.yml
+#conda info --envs
+#conda env create -f environment.yml -prefix E:\path\to\envs\tf_hub_env
+#conda create --name myenv --file spec-file.txt
+#conda remove --name tf_env --all
+#conda remove --prefix D:\conda_envs\tf_hub_env --all
+#conda list
+#conda list --explicit > spec-file.txt
+#conda env export > environment.yml
 #conda create -n tf_env python=3.9
 #conda activate tf_env
 #pip install tensorflow==2.12.0
@@ -15,7 +20,6 @@ import tensorflow as tf
 #tf_env\Scripts\activate     # Windows
 #pip install tensorflow==2.12.0 tensorflow-hub==0.13.0 keras==2.12.0 numpy==1.23.5 tensorboard==2.12.0
 #pip install tensorflow==2.12.0 keras==2.12.0 numpy==1.23.5 tensorboard==2.12.0 --force-reinstall
-#conda remove --name tf_env --all
 #Remove-Item -Recurse -Force C:\Users\YourName\miniconda3\envs\tf_env
 print(tf.__version__)  # 应显示您安装的版本
 print(tf.keras.__version__)  # 对应版本应自动匹配

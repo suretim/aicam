@@ -29,8 +29,8 @@ ALPHA_CLS = 1.0   # classification loss weight
 BETA_DISTILL = 1.0  # distillation (MSE) loss weight
 
 # Dataset directories (update to your paths)
-TRAIN_DIR = "data/train"  # expected: data/train/class_x/xxx.jpg
-VAL_DIR   = "data/val"
+TRAIN_DIR = "../../../../dataset/sprout_y_n_data3/train"  # expected: data/train/class_x/xxx.jpg
+VAL_DIR   = "../../../../dataset/sprout_y_n_data3/val"
 
 # TFLite output paths
 TFLITE_FP32 = "student_fp32.tflite"

@@ -128,7 +128,9 @@ dummy_y[0, 0] = 1  # 假标签
 model.train_on_batch(dummy_x, dummy_y)
 
 # 再保存
-model.save("saved_model_best")
+tf.saved_model.save(model, "saved_model_best", options=tf.saved_model.SaveOptions(experimental_custom_gradients=False))
+
+#model.save("saved_model_best")
 print(f"\n数据加载成功！类别对应关系: {train_data.class_indices}")
 
 
@@ -153,15 +155,20 @@ callbacks = [
 print("\n开始训练...")
 history = model.fit(
     train_data,
-    epochs=EPOCHS
+    epochs=EPOCHS,
     #validation_data=val_data
-    #callbacks=callbacks
+    callbacks=callbacks
 )
+tf.saved_model.save(model, "best_model", options=tf.saved_model.SaveOptions(experimental_custom_gradients=False))
+
 #keras_model = tf.keras.models.load_model('best_model.tf')
-converter = tf.lite.TFLiteConverter.from_keras_model(model)
-tflite_model = converter.convert()
-with open('model.tflite', 'wb') as f:
-    f.write(tflite_model)
+
+#converter = tf.lite.TFLiteConverter.from_saved_model("saved_model")
+
+#converter = tf.lite.TFLiteConverter.from_keras_model(model)
+#tflite_model = converter.convert()
+#with open('model.tflite', 'wb') as f:
+#    f.write(tflite_model)
 
 
 

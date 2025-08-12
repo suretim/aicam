@@ -1,5 +1,5 @@
 # environment.yml
-#conda env create -f environment.yml --prefix E:\conda_envs\tf_hub_env
+#conda env create -f environment.yml --prefix C:\conda_envs\tf_hub_env
 #conda remove --prefix E:\conda_envs\tf_hub_env --all
 
 name: tf_hub_env
@@ -18,5 +18,5 @@ dependencies:
     - tensorboard==2.12.0
     - tensorflow-hub==0.13.0  # 使用pip安装的版本
     - protobuf~=3.20.0
-  - cudatoolkit=11.8  # 如果你有支持的 NVIDIA GPU，可以启用 CUDA 支持  
+  #- cudatoolkit=11.8  # 如果你有支持的 NVIDIA GPU，可以启用 CUDA 支持
 
