@@ -1,0 +1,4 @@
+FROM tensorflow/tensorflow:2.12.0-gpu
+
+# 验证环境
+CMD python3 -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
