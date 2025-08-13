@@ -40,3 +40,14 @@ docker import my-vscode-container.tar my-vscode-restored:latest
 
 docker save -o my-vscode-backup.tar my-vscode-backup:latest
 docker load -i my-vscode-backup.tar
+
+跑GPU
+docker run --gpus all nvidia/cuda:12.2.0-base nvidia-smi
+wsl --install
+wsl.exe --install Ubuntu-24.04
+# 进入 PyTorch GPU 容器并访问 Windows 项目
+docker run -it --gpus all -v C:\Users\你的用户名\projects:/workspace pytorch/pytorch:2.3.0-cuda12.1-cudnn8-runtime bash
+
+# 进入 TensorFlow GPU 容器
+docker run -it --gpus all -v C:\Users\你的用户名\projects:/workspace tensorflow/tensorflow:2.14.0-gpu bash
+
