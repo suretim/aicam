@@ -17,11 +17,53 @@ Notes:
    and the final logits Dense is the classifier (or final layer).
  - For int8 quantization, provide representative dataset dir (--representative_dir).
 """
+#!/usr/bin/env python3
+"""
+Export student encoder -> TFLite + export classifier weights to C header + bin.
+"""
 
+# !/usr/bin/env python3
+"""
+Export student encoder -> TFLite + export classifier weights to C header + bin.
+"""
+
+import sys
+import subprocess
+
+
+# 检测并自动修复 NumPy/TensorFlow 版本
+def ensure_numpy_tf_compat():
+    try:
+        import tensorflow as tf
+        import numpy as np
+    except ImportError:
+        return  # 如果没装，后面会提示
+
+    tf_version = tuple(map(int, tf.__version__.split(".")[:2]))
+    np_version = tuple(map(int, np.__version__.split(".")[:2]))
+
+    if tf_version < (2, 16) and np_version >= (2, 0):
+        print(f"[WARN] Detected TensorFlow {tf.__version__} + NumPy {np.__version__}, "
+              f"this will cause '_ARRAY_API not found'.")
+        print("[INFO] Auto-downgrading NumPy to 1.26.4 for compatibility...")
+
+        # 执行 pip 安装
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "numpy==1.26.4", "--upgrade"])
+
+        print("[INFO] NumPy downgraded. Restarting script...")
+        # 重启当前脚本
+        os.execv(sys.executable, [sys.executable] + sys.argv)
+
+
+# 先检测修复
+ensure_numpy_tf_compat()
+
+# 现在安全导入
+import tensorflow as tf
+import numpy as np
 import argparse
 import os
-import numpy as np
-import tensorflow as tf
+
 
 def save_c_array_floats(arr: np.ndarray, varname: str, filename: str, fmt="%.8ff"):
     """
