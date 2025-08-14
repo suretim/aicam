@@ -17,7 +17,22 @@ docker pull registry.cn-hangzhou.aliyuncs.com/tensorflow/tensorflow:2.12.0-gpu
 ping registry-1.docker.io
 curl -v https://registry-1.docker.io/v2/
 docker images
-docker run --gpus all -it tensorflow/tensorflow:2.12.0-gpu python -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
+#重要
+#docker run --gpus all -it tensorflow/tensorflow:2.12.0-gpu python -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
+docker run --gpus all -it tensorflow/tensorflow:2.12.0-gpu
+docker run -it --gpus all -v C:\tim:/workspace tensorflow/tensorflow:2.12.0-gpu bash
+docker ps
+docker stop a1b2c3d4e5f6  # 使用容器ID或名称
+docker rm a1b2c3d4e5f6  # 使用容器ID或名称
+docker rmi a1b2c3d4e5f6  # 使用镜像ID或名称
+docker logs a1b2c3d4e5f6  # 使用容器ID或名称
+docker rmi tensorflow/tensorflow:2.12.0-gpu
+docker system prune -a
+pip install -r lab_requirements.txt
+pillow==9.5.0
+h5py==3.8.0
+tensorflow-hub==0.13.0
+
 
 挂载临时文件（动态修改）
 docker run -v /host/path/file.txt:/app/file.txt my-image
@@ -49,5 +64,5 @@ wsl.exe --install Ubuntu-24.04
 docker run -it --gpus all -v C:\Users\你的用户名\projects:/workspace pytorch/pytorch:2.3.0-cuda12.1-cudnn8-runtime bash
 
 # 进入 TensorFlow GPU 容器
-docker run -it --gpus all -v C:\Users\你的用户名\projects:/workspace tensorflow/tensorflow:2.14.0-gpu bash
+docker run -it --gpus all -v C:\tim:/workspace tensorflow/tensorflow:2.14.0-gpu bash
 

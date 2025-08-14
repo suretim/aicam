@@ -6,14 +6,7 @@
 #include <sstream>
 #include <stdlib.h> 
 #include <math.h>
-
-//extern float g_weights[CLASSIFIER_OUTPUT_DIM][CLASSIFIER_INPUT_DIM];
-//extern float g_bias[CLASSIFIER_OUTPUT_DIM];
  
-
-// 假设你的模型分类头是一个 Dense 层，有 N 个输入，M 个输出
-// #define NUM_INPUTS 64
-// #define NUM_CLASSES 3
 #define CLASSIFIER_INPUT_DIM 64
 #define CLASSIFIER_OUTPUT_DIM 3
 

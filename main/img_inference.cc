@@ -14,28 +14,12 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h" 
 #include "freertos/semphr.h"  // 这是定义信号量相关函数和类型的头文件
-#define MODEL_INPUT_SIZE 64
-#define EMBEDDING_DIM 64
+ 
 
 #define RGB565          0
 #define RGB888        1
 #define RGBTYPE        RGB565
-//static u_int8_t tensor_state=0;
-
-//float g_buffer[MODEL_INPUT_SIZE*MODEL_INPUT_SIZE];
-//float  feat_out[EMBEDDING_DIM ];
-//extern float  feat_out[EMBEDDING_DIM ];
- // extern  unsigned char g_model[];
-// 设备日志
-//#define TENSOR_ARENA_SIZE (100 * 1024)
-//static uint8_t tensor_arena[TENSOR_ARENA_SIZE];
-
-// static  camera_fb_t *fb_pic = NULL;
-// typedef struct {
-//         int width;
-//         int height;
-//         uint8_t * data;
-// } fb_data_t;
+ 
 static const char *TAG = "Inference";
 
 
@@ -57,11 +41,11 @@ TfLiteTensor* input = nullptr;
 // signed 8-bit integers is to subtract 128 from the unsigned value to get a
 // signed value.
 
-#if CONFIG_NN_OPTIMIZED
-constexpr int scratchBufSize = 60 * 1024;
-#else
-constexpr int scratchBufSize = 0;
-#endif
+// #if CONFIG_NN_OPTIMIZED
+// constexpr int scratchBufSize = 60 * 1024;
+// #else
+// constexpr int scratchBufSize = 0;
+// #endif
 // An area of memory to use for input, output, and intermediate arrays.
 // Keeping allocation on bit larger size to accomodate future needs.
 //constexpr int kTensorArenaSize = 100 * 1024 + scratchBufSize;
@@ -84,6 +68,11 @@ TfLiteStatus GetESPImage(void) {
   int image_width = input->dims->data[1];
   int image_height = input->dims->data[2];
   int channels = input->dims->data[3];
+  printf("input dims: %d %d %d %d\n",
+       input->dims->data[0],
+       input->dims->data[1],
+       input->dims->data[2],
+       input->dims->data[3]);
     //if (xSemaphoreTake(web_send_mutex, portMAX_DELAY) == pdTRUE){
         camera_fb_t* fb = esp_camera_fb_get();
         if (!fb) {
@@ -109,21 +98,19 @@ TfLiteStatus GetESPImage(void) {
         return kTfLiteError;
     }
  #endif
- #if 0
   
-    for (int i = 0; i < image_width* image_height*channels; i++) {
-        image_data[i] = 0.0f;  // 示例全部清零
-    }
- #else
     const int src_w = fb->width;
     const int src_h = fb->height;
+    const int src_channel=2;
     const uint8_t* src =fb->buf;// rgb888_buf;//fb->buf;
+    printf("input dims: %d %d %d and src dims %d %d %d\n",
+       input->dims->data[1],input->dims->data[2],input->dims->data[3],src_w,src_w,src_channel);
     for (int y = 0; y < image_height; ++y) {
         for (int x = 0; x < image_width; ++x) {
             // 最近邻采样：将 160x120 → 64x64
             int src_x = x * src_w / image_width;
             int src_y = y * src_h / image_height;
-            int index = (src_y * src_w + src_x) * 2; // 每像素2字节(RGB565)
+            int index = (src_y * src_w + src_x) * src_channel; // 每像素2字节(RGB565)
 
             // 提取 RGB565 中的灰度近似
             uint8_t byte1 = src[index];
@@ -142,7 +129,7 @@ TfLiteStatus GetESPImage(void) {
             input->data.f[input_index*channels+2]  = b * 11.0f;  // 归一化为 float32
         }
     }   
-    #endif
+     
     esp_camera_fb_return(fb);
 #if RGBTYPE   ==     RGB888
     free(rgb888_buf);  
@@ -158,19 +145,7 @@ TfLiteStatus GetESPImage(void) {
 
 // The name of this function is important for Arduino compatibility.
 TfLiteStatus loop() {
- // TfLiteTensor* input = interpreter.input(0);
-// ESP_LOGI(TAG, "Input dims: %d", input->dims->size);
-// for (int i = 0; i < input->dims->size; ++i) {
-//     ESP_LOGI(TAG, "dim %d: %d", i, input->dims->data[i]);
-// }
-
-// if (input->dims->size != 4 || 
-//     input->dims->data[1] != 64 || 
-//     input->dims->data[2] != 64 || 
-//     input->dims->data[3] != 3) {
-//     printf("Error: Unexpected input shape\n");
-//     return kTfLiteError;
-// } 
+  
    
   if (kTfLiteOk != GetESPImage()) {
     MicroPrintf("Image capture failed.");
@@ -190,7 +165,7 @@ TfLiteStatus loop() {
 } 
 
 
-extern const unsigned char encoder_model_float[] asm("_binary_encoder_model_tflite_start");
+extern const unsigned char encoder_model_float[] asm("_binary_student_fp32_tflite_start");
 
 // The name of this function is important for Arduino compatibility.
 TfLiteStatus setup(void) {
@@ -206,27 +181,28 @@ TfLiteStatus setup(void) {
     }
 
     if (tensor_arena == NULL) {
-      //tensor_arena = (uint8_t *) heap_caps_malloc(kTensorArenaSize, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-      
-      tensor_arena = (uint8_t*) heap_caps_malloc(kTensorArenaSize, MALLOC_CAP_SPIRAM);
+       tensor_arena = (uint8_t*) heap_caps_malloc(kTensorArenaSize, MALLOC_CAP_SPIRAM);
     }
     if (tensor_arena == NULL) {
       printf("Couldn't allocate memory of %d bytes\n", kTensorArenaSize);
       return kTfLiteError;
     }
  
-    tflite::MicroMutableOpResolver<12> micro_op_resolver;
+    tflite::MicroMutableOpResolver<11> micro_op_resolver;
+    micro_op_resolver.AddStridedSlice();
+    micro_op_resolver.AddPack();
     micro_op_resolver.AddConv2D();
     micro_op_resolver.AddRelu();
-    micro_op_resolver.AddMaxPool2D();
+    //micro_op_resolver.AddMaxPool2D();
     micro_op_resolver.AddAveragePool2D();
     micro_op_resolver.AddReshape();  // 🔧 添加这个
     micro_op_resolver.AddFullyConnected();  // 如果你有 dense 层也要加
     micro_op_resolver.AddQuantize();
     micro_op_resolver.AddDequantize();
     micro_op_resolver.AddSoftmax();
-    micro_op_resolver.AddAdd();
-    micro_op_resolver.AddMul();
+    //micro_op_resolver.AddAdd();
+    //micro_op_resolver.AddMul();
+    micro_op_resolver.AddShape();
     
   static tflite::MicroInterpreter static_interpreter(
       model, micro_op_resolver, tensor_arena, kTensorArenaSize);

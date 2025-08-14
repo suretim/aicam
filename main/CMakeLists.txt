@@ -36,7 +36,11 @@ idf_component_register(
             "config_mqtt.cpp" 
             "classifier.cc" 
             
-        EMBED_FILES "web_content/index_http.html" "web_content/index_socket.html" "web_content/index_ecm.html" "encoder_model.tflite"
+        EMBED_FILES 
+            "web_content/index_http.html" 
+            "web_content/index_socket.html" 
+            "web_content/index_ecm.html" 
+            "fed_server/vit/student_fp32.tflite"
           
         #PRIV_REQUIRES mqtt nvs_flash esp_psram esp_http_server console esp_netif esp_http_server esp_wifi esp32-camera esp-tflite-micro esp_timer cjson lwip esp_eth driver
         PRIV_REQUIRES mqtt nanopb nvs_flash esp_psram esp_http_server console esp_netif esp_http_server esp_wifi esp32-camera tflite-micro json

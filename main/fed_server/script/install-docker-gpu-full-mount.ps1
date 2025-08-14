@@ -55,6 +55,8 @@ wsl bash -c "
 "
 
 Write-Host "=== 8. 测试 GPU 容器 ==="
+#export HTTP_PROXY=http://192.168.0.57:<proxy-port>
+#export HTTPS_PROXY=http://<your-windows-ip>:<proxy-port>
 wsl bash -c "docker run --rm --gpus all nvidia/cuda:12.2.0-base nvidia-smi"
 
 Write-Host "=== 9. 拉取 PyTorch GPU 镜像 ==="

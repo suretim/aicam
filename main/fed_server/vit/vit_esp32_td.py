@@ -15,9 +15,10 @@ import numpy as np
 # -------------------------
 # Config / Hyperparameters
 # -------------------------
-IMG_SIZE = (224, 224)  # ViT expected input
+TEACHER_IMG_SIZE= (224, 224)  # ViT expected input
+IMG_SIZE = (224, 224)  # esp32 src input
 BATCH_SIZE = 32
-EPOCHS = 1
+EPOCHS = 30
 LEARNING_RATE = 1e-4
 
 # Student projection dimension. To perfectly mimic ViT set to 768.
@@ -83,38 +84,88 @@ def build_dummy_ds(num_batches=100, batch_size=BATCH_SIZE, img_size=IMG_SIZE, nu
     return ds
 
 # Preprocessing: ViT expects images in [0,1] and size 224x224 (TF-Hub model handles no extra mean/std)
-def preprocess_for_vit(images):
+def preprocess_for_student(images):
     # images assumed 0-255 input; convert to 0-1 float
-    images = tf.image.convert_image_dtype(images, dtype=tf.float32)
+    images = tf.image.convert_image_dtype(images, dtype=tf.float32) 
     return images
+# Preprocessing for ViT feature extractor
+def preprocess_for_vit(images):
+    # Resize images to the expected size for ViT (224x224)
+    images = tf.image.resize(images, TEACHER_IMG_SIZE)  # 224x224 for ViT
+    images = tf.image.convert_image_dtype(images, dtype=tf.float32)  # Convert to float32
+    return images
+ 
+# -------------------------
+# Teacher (ViT) loader 
+ 
 
-# -------------------------
-# Teacher (ViT) loader
-# -------------------------
 def load_vit_teacher(vit_url="https://tfhub.dev/sayakpaul/vit_b16_fe/1"):
     print("Loading ViT feature extractor from TF-Hub:", vit_url)
     vit_layer = hub.KerasLayer(vit_url, trainable=False)
     # Wrap into a Keras Model for convenience
-    inputs = tf.keras.Input(shape=IMG_SIZE + (3,))
-    x = preprocess_for_vit(inputs)
+    teacher_inputs= tf.keras.Input(shape= TEACHER_IMG_SIZE + (3,))
+    inputs = tf.keras.Input(shape= IMG_SIZE + (3,))
+    x = preprocess_for_vit(teacher_inputs)
     feats = vit_layer(x)
     model = tf.keras.Model(inputs=inputs, outputs=feats, name="vit_teacher_fe")
+    return model
+# Teacher (ViT) loader
+def load_vit_teacher0(vit_url="https://tfhub.dev/sayakpaul/vit_b16_fe/1"):
+    print("Loading ViT feature extractor from TF-Hub:", vit_url)
+    vit_layer = hub.KerasLayer(vit_url, trainable=False)
+    
+    inputs = tf.keras.Input(shape=TEACHER_IMG_SIZE + (3,))  # Shape should be (224, 224, 3)
+    x = preprocess_for_vit(inputs)  # Apply preprocessing
+    feats = vit_layer(x)  # Get features from ViT model
+    model = tf.keras.Model(inputs=inputs, outputs=feats, name="vit_teacher_fe")
+    
     return model
 
 # -------------------------
 # Student model
 # -------------------------
-def create_student_cnn(input_shape=IMG_SIZE+(3,), feature_dim=STUDENT_FEATURE_DIM):
+ 
+def create_student_cnn (input_shape= IMG_SIZE+(3,), feature_dim=STUDENT_FEATURE_DIM):
     inputs = tf.keras.Input(shape=input_shape)
-    x = preprocess_for_vit(inputs)  # same preprocessing pipeline: 0-1
+    x = preprocess_for_student(inputs)
+    x = tf.keras.layers.Conv2D(32, 3, strides=2, padding="same", activation="relu")(x)
+    x = tf.keras.layers.Conv2D(64, 3, strides=2, padding="same", activation="relu")(x)
+    x = tf.keras.layers.Conv2D(128, 3, strides=2, padding="same", activation="relu")(x)  # (28,28,128)
+    #x = tf.keras.layers.Conv2D(256, 3, strides=2, padding="same", activation="relu")(x) # 8 -> 4
+    #x = tf.keras.layers.Conv2D(512, 3, strides=2, padding="same", activation="relu")(x) # 3 -> 2
+    
+    # 替代 GlobalAveragePooling2D
+    x = tf.keras.layers.AveragePooling2D(pool_size=(28,28), strides=(1, 1), padding="valid")(x)  # (1,1,128)
+       
+    # 展平并映射到 feature_dim
+    x = tf.keras.layers.Reshape((128,))(x)  # 输出 (batch, 512)
+    
+    # Dense 映射到指定 feature_dim
+    feats = tf.keras.layers.Dense(feature_dim, name="student_features")(x)
+     
+    model = tf.keras.Model(inputs=inputs, outputs=feats, name="student_cnn")
+    return model
+
+
+def create_student_cnn0(input_shape=IMG_SIZE + (3,), feature_dim=STUDENT_FEATURE_DIM):
+    inputs = tf.keras.Input(shape=input_shape)
+    x = preprocess_for_student(inputs)
+
     # Lightweight conv stack (tunable)
     x = tf.keras.layers.Conv2D(32, 3, strides=2, padding="same", activation="relu")(x)  # 112x112x32
     x = tf.keras.layers.Conv2D(64, 3, strides=2, padding="same", activation="relu")(x)  # 56x56x64
     x = tf.keras.layers.Conv2D(128, 3, strides=2, padding="same", activation="relu")(x)  # 28x28x128
-    x = tf.keras.layers.GlobalAveragePooling2D()(x)  # (batch, 128)
-    # Map to feature_dim to match teacher feature size (or a compressed dim)
-    feats = tf.keras.layers.Dense(feature_dim, name="student_features")(x)
-    # Optionally L2-normalize or not — depends on distillation objective; leave raw here
+
+    # Use AveragePooling2D instead of GlobalAveragePooling2D
+    # Adjust pool_size based on your input/output dimensions (this can be smaller)
+    x = tf.keras.layers.AveragePooling2D(pool_size=(4, 4), strides=(1, 1), padding="valid")(x)  # (batch, 7, 7, 128)
+
+    # Flatten before Dense layer
+    x = tf.keras.layers.Flatten()(x)  # Flatten to (batch, 128 * 7 * 7)
+
+    # Dense layer to output the feature dimension
+    feats = tf.keras.layers.Dense(feature_dim, name="student_features")(x)  # Map to feature_dim
+
     model = tf.keras.Model(inputs=inputs, outputs=feats, name="student_cnn")
     return model
 
