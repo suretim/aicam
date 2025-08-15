@@ -31,24 +31,7 @@ namespace {
 const tflite::Model* model = nullptr;
 tflite::MicroInterpreter* interpreter = nullptr;
 TfLiteTensor* input = nullptr;
- TfLiteTensor* output= nullptr;
-  //  float* output_data=nullptr;
-  //  float* input_data=nullptr;
-// In order to use optimized tensorflow lite kernels, a signed int8_t quantized
-// model is preferred over the legacy unsigned model format. This means that
-// throughout this project, input images must be converted from unisgned to
-// signed format. The easiest and quickest way to convert from unsigned to
-// signed 8-bit integers is to subtract 128 from the unsigned value to get a
-// signed value.
-
-// #if CONFIG_NN_OPTIMIZED
-// constexpr int scratchBufSize = 60 * 1024;
-// #else
-// constexpr int scratchBufSize = 0;
-// #endif
-// An area of memory to use for input, output, and intermediate arrays.
-// Keeping allocation on bit larger size to accomodate future needs.
-//constexpr int kTensorArenaSize = 100 * 1024 + scratchBufSize;
+ TfLiteTensor* output= nullptr; 
 
 constexpr int kTensorArenaSize = 1024 * 1024;  
 static uint8_t *tensor_arena;//[kTensorArenaSize]; // Maybe we should move this to external
@@ -97,7 +80,7 @@ TfLiteStatus GetESPImage(void) {
         free(rgb888_buf);
         return kTfLiteError;
     }
- #endif
+#endif
   
     const int src_w = fb->width;
     const int src_h = fb->height;
@@ -140,9 +123,7 @@ TfLiteStatus GetESPImage(void) {
   return kTfLiteOk; 
 }
  
-
-
-
+ 
 // The name of this function is important for Arduino compatibility.
 TfLiteStatus loop() {
   
@@ -164,8 +145,42 @@ TfLiteStatus loop() {
   return kTfLiteOk;
 } 
 
+void set_up_student() {
+    // 加载模型
+    const tflite::Model* model = tflite::GetModel(student_model_tflite);
+    if (model->version() != TFLITE_SCHEMA_VERSION) {
+        printf("Model schema version mismatch!\n");
+        return;
+    }
 
-extern const unsigned char encoder_model_float[] asm("_binary_student_fp32_tflite_start");
+    // 注册算子
+    static tflite::AllOpsResolver resolver;
+
+    // 创建解释器
+    static tflite::MicroInterpreter interpreter(model, resolver, tensor_arena, kTensorArenaSize);
+    interpreter.AllocateTensors(); 
+    // 获取输入输出
+     input = interpreter.input(0);
+     output = interpreter.output(0);  
+
+    if (kTfLiteOk != loop()) {
+      MicroPrintf("Image loop failed.");
+      return kTfLiteError;
+    } 
+ 
+    ESP_LOGI(TAG, "推理完成，系统正常运行");
+    // 输出结果
+    //printf("Predictions:\n");
+    //for (int i = 0; i < output->dims->data[1]; i++) {
+    //    printf("Class %d: %f\n", i, output->data.f[i]);
+    //}
+}
+
+
+
+
+extern const unsigned char encoder_model_float[]  asm("_binary_student_fp32_tflite_start");
+extern const unsigned char student_model_tflite[] asm("_binary_student_model_tflite_start");
 
 // The name of this function is important for Arduino compatibility.
 TfLiteStatus setup(void) {
@@ -230,18 +245,8 @@ TfLiteStatus setup(void) {
   if (kTfLiteOk != loop()) {
     MicroPrintf("Image loop failed.");
     return kTfLiteError;
-  }
-    
-
-    // 13. 读取输出结果
-    //float *output_buffer = output->data.f;
-    //int output_size = output->bytes / sizeof(float);
-
-    // ESP_LOGI(TAG, "推理结果：");
-    // for (int i = 0; i < output_size; i++) {
-    //     ESP_LOGI(TAG, "  output[%d] = %f", i, output_buffer[i]);
-    // }
-
+  } 
+ 
     ESP_LOGI(TAG, "推理完成，系统正常运行");
 #endif
 return kTfLiteOk;
@@ -251,26 +256,16 @@ return kTfLiteOk;
 //u_int8_t get_tensor_state(void);
 void tensor_run(void) 
 {
-
-    //  if(kTfLiteError== setup())
-    //   { 
-    //     return;
-    //   } 
+ 
      while (true)
      {
      
-      //if (xSemaphoreTake(web_send_mutex, portMAX_DELAY) == pdTRUE) {
-          //if(get_tensor_state()){
+       
             if(kTfLiteError== setup())
             {
               break; 
             }
-         // }
-      //    xSemaphoreGive(web_send_mutex);
-      //}
-      // if(get_tensor_state()){
-      //   loop();
-      // }
+          
       vTaskDelay(pdMS_TO_TICKS(10000));  // 每10秒输出一次
       //  vTaskDelay(30000 / portTICK_PERIOD_MS);
     }  
@@ -298,47 +293,3 @@ void tensor_task(void *arg)
    
 }
  
-// void run_encoder_inference(const uint8_t *input_image, float *output_vector) {
-
-
-//     // 初始化模型
-//     const tflite::Model* model = tflite::GetModel(encoder_model_float);
-//     // static tflite::AllOpsResolver resolver;
-//     // static tflite::MicroInterpreter interpreter(model, resolver, tensor_arena, TENSOR_ARENA_SIZE);
-//     // interpreter.AllocateTensors();
-
-
-
-// //static tflite::MicroErrorReporter micro_error_reporter;
-//     tflite::MicroMutableOpResolver<6> resolver;
-//     resolver.AddConv2D();
-//     resolver.AddRelu();
-//     resolver.AddMaxPool2D();
-//     resolver.AddAveragePool2D(); 
-//     resolver.AddReshape(); 
-    
-//     constexpr int kTensorArenaSize = 350 * 1024;   
-//     uint8_t* tensor_arena = (uint8_t*) heap_caps_malloc(kTensorArenaSize, MALLOC_CAP_SPIRAM);
-//     tflite::MicroInterpreter interpreter(model, resolver, tensor_arena, kTensorArenaSize);
- 
-//     interpreter.AllocateTensors();
-
-//     // 获取输入 tensor 并填充数据
-//     TfLiteTensor* input = interpreter.input(0);  // shape: [1, 64, 64, 3]
-//     for (int i = 0; i < 64 * 64 * 3; ++i) {
-//         input->data.f[i] = (float)input_image[i] / 255.0f;
-//     }
-
-//     // 执行推理
-//     TfLiteStatus invoke_status = interpreter.Invoke();
-//     if (invoke_status != kTfLiteOk) {
-//         printf("TFLite inference failed\n");
-//         return;
-//     }
-
-//     // 获取输出 tensor（特征向量）
-//     TfLiteTensor* output = interpreter.output(0);  // shape: [1, 64]
-//     for (int i = 0; i < 64; ++i) {
-//         output_vector[i] = output->data.f[i];
-//     }
-// }

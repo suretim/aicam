@@ -122,6 +122,7 @@ def create_teacher_cnn(input_shape=(224, 224, 3), num_classes=3):
  
 # -------------------------
 # 主流程
+# (1) python server_teacher_kd.py
 # -------------------------
 def main(args):
     global EPOCHS, BATCH_SIZE, TRAIN_DIR, VAL_DIR, SOFT_LABEL_FILE

@@ -155,9 +155,9 @@ def rep_dataset_from_dir(train_dir, img_size, take=200):
 
 # -------------------------
 # Main
-# python soft_label_distill_tf.py --precompute_softlabels --out_dir ./kd_out
-# python soft_label_distill_tf.py --use_cached_softlabels --epochs 20 --lr 1e-4 --temperature 2.0 --alpha 0.5 --out_dir ./kd_out
-# python soft_label_distill_tf.py --export_tflite
+# python kd_server_label.py --precompute_softlabels --out_dir ./kd_out
+# python kd_server_label.py --use_cached_softlabels --epochs 20 --lr 1e-4 --temperature 2.0 --alpha 0.5 --out_dir ./kd_out
+# python kd_server_label.py --export_tflite
    
   
 # -------------------------

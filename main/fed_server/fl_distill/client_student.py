@@ -38,7 +38,7 @@ def distillation_loss(y_true, y_pred, soft_labels, alpha=0.5, temperature=2.0):
         soft_labels, tf.nn.softmax(y_pred / temperature), from_logits=False
     )
     return alpha * hard_loss + (1 - alpha) * soft_loss
-
+# python client_student.py
 def main(args):
     # 更新全局变量
     global EPOCHS, BATCH_SIZE, STUDENT_FEATURE_DIM, TRAIN_DIR, VAL_DIR, SOFT_LABEL_FILE
