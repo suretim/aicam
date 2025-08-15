@@ -1,6 +1,6 @@
 @echo off
 REM 一键创建 TF 和 Flower 两个环境，解决 NumPy 版本冲突
-
+rem net use F: "\\vmware-host\Shared Folders" /persistent:yes
 echo ===== 创建 TensorFlow 环境 (tf_env) =====
 conda create -n tf_env python=3.10 -y
 call conda activate tf_env
@@ -25,9 +25,9 @@ keras==2.12.0
 h5py==3.8.0
 pillow==9.5.0
 tensorflow-hub==0.13.0
-argparse
-  json
-  base64
+pip install argparse
+pip install json
+pip install base64
 echo 测试 Flower 环境版本
 python -c "import flwr as fl; import numpy as np; print('Flower env ->', fl.__version__, np.__version__)"
 

@@ -13,8 +13,11 @@ import tensorflow as tf
 EPOCHS = 1
 BATCH_SIZE = 32
 STUDENT_FEATURE_DIM = 768
-TRAIN_DIR = "data/train"
-VAL_DIR = "data/val"
+#TRAIN_DIR = "data/train"
+#VAL_DIR = "data/val"
+TRAIN_DIR = "../../../../dataset/sprout_y_n_data3/train"  # expected: data/train/class_x/xxx.jpg
+VAL_DIR   = "../../../../dataset/sprout_y_n_data3/val"
+
 TEACHER_TFLITE = "teacher.tflite"
 SOFTLABEL_OUTPUT = "soft_labels.npz"
 TEACHER_IMG_SIZE = (224, 224)  # typical for ViT

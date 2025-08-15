@@ -121,10 +121,11 @@ def create_student_cnn(input_shape=IMG_SIZE+(3,), feature_dim=STUDENT_FEATURE_DI
     # Lightweight conv stack (tunable)
     x = tf.keras.layers.Conv2D(32, 3, strides=2, padding="same", activation="relu")(x)  # 112x112x32
     x = tf.keras.layers.Conv2D(64, 3, strides=2, padding="same", activation="relu")(x)  # 56x56x64
-    x = tf.keras.layers.Conv2D(64, 3, strides=2, padding="same", activation="relu")(x)  # 28x28x128
-    #x = tf.keras.layers.Conv2D(256, 3, strides=2, padding="same", activation="relu")(x)  # 14x14x256
+    x = tf.keras.layers.Conv2D(128, 3, strides=2, padding="same", activation="relu")(x)  # 28x28x128
+    x = tf.keras.layers.Conv2D(256, 3, strides=2, padding="same", activation="relu")(x)  # 14x14x256
+    x = tf.keras.layers.Conv2D(64, 3, strides=2, padding="same", activation="relu")(x)  # 14x14x256
     #x = tf.keras.layers.GlobalAveragePooling2D()(x)  # (batch, 128)
-    x = tf.keras.layers.AveragePooling2D(pool_size=(8, 8), strides=(1, 1), padding="valid")(x)  # (batch, 7, 7, 128)
+    x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2), strides=(1, 1), padding="valid")(x)  # (batch, 7, 7, 128)
     x = tf.keras.layers.Reshape((64,))(x)  # 输出 (batch, 512)
     #x = tf.keras.layers.Flatten()(x)
     # Map to feature_dim to match teacher feature size (or a compressed dim)

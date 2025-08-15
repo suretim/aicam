@@ -8,8 +8,9 @@ import tensorflow as tf
 EPOCHS = 10
 BATCH_SIZE = 32
 STUDENT_FEATURE_DIM = 64
-TRAIN_DIR = "data/train"
-VAL_DIR = "data/val"
+TRAIN_DIR = "../../../../dataset/sprout_y_n_data3/train"  # expected: data/train/class_x/xxx.jpg
+VAL_DIR   = "../../../../dataset/sprout_y_n_data3/val"
+
 SOFTLABEL_INPUT = "soft_labels.npy"
 STUDENT_MODEL_PATH = "student_distilled.h5"
 TEMPERATURE = 4.0

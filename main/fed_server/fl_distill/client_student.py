@@ -7,8 +7,11 @@ import tensorflow as tf
 EPOCHS = 10
 BATCH_SIZE = 32
 STUDENT_FEATURE_DIM = 64
-TRAIN_DIR = "./train_data"
-VAL_DIR = "./val_data"
+#TRAIN_DIR = "./train_data"
+#VAL_DIR = "./val_data"
+TRAIN_DIR = "../../../../dataset/sprout_y_n_data3/train"  # expected: data/train/class_x/xxx.jpg
+VAL_DIR   = "../../../../dataset/sprout_y_n_data3/val"
+
 SOFT_LABEL_FILE = "soft_labels.npz"
 
 def load_dataset(data_dir, img_size=(224, 224), batch_size=32):

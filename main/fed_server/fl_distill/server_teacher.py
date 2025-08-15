@@ -6,8 +6,10 @@ import tensorflow as tf
 # ==== 默认参数 ====
 EPOCHS = 10
 BATCH_SIZE = 32
-TRAIN_DIR = "./train_data"
-VAL_DIR = "./val_data"
+#TRAIN_DIR = "./train_data"
+#VAL_DIR = "./val_data"
+TRAIN_DIR = "../../../../dataset/sprout_y_n_data3/train"  # expected: data/train/class_x/xxx.jpg
+VAL_DIR   = "../../../../dataset/sprout_y_n_data3/val"
 SOFT_LABEL_FILE = "soft_labels.npz"
 
 # 加载数据
@@ -49,6 +51,7 @@ def main(args):
         metrics=["accuracy"]
     )
     teacher.fit(train_ds, validation_data=val_ds, epochs=EPOCHS)
+    teacher.save("teacher_saved_model") 
 
     # 生成 soft labels
     logits = teacher.predict(train_ds)

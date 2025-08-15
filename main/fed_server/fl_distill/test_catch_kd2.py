@@ -82,28 +82,14 @@ class KDModel(tf.keras.Model):
             loss = self.alpha * ce_loss + (1.0 - self.alpha) * kl_loss
         grads = tape.gradient(loss, self.student.trainable_variables)
         self.optimizer.apply_gradients(zip(grads, self.student.trainable_variables))
-        acc = tf.reduce_mean(
-            tf.cast(
-                tf.equal(tf.argmax(logits, axis=-1), tf.cast(y, tf.int64)),
-                tf.float32
-            )
-        )
-
-
-        #acc = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(logits, axis=-1), y), tf.float32))
+        acc = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(logits, axis=-1), y), tf.float32))
         return {"loss": loss, "acc": acc}
 
     def test_step(self, data):
         x, y, soft = data
         logits = self.student(x, training=False)
         ce_loss = self.ce(y, logits)
-        acc = tf.reduce_mean(
-            tf.cast(
-                tf.equal(tf.argmax(logits, axis=-1), tf.cast(y, tf.int64)),
-                tf.float32
-            )
-        )
-        #acc = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(logits, axis=-1), y), tf.float32))
+        acc = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(logits, axis=-1), y), tf.float32))
         return {"loss": ce_loss, "acc": acc}
 
 # -------------------------
@@ -155,11 +141,9 @@ def rep_dataset_from_dir(train_dir, img_size, take=200):
 
 # -------------------------
 # Main
-# python soft_label_distill_tf.py --precompute_softlabels --out_dir ./kd_out
-# python soft_label_distill_tf.py --use_cached_softlabels --epochs 20 --lr 1e-4 --temperature 2.0 --alpha 0.5 --out_dir ./kd_out
-# python soft_label_distill_tf.py --export_tflite
-   
-  
+# python dt_logit.py --use_cached_softlabels --epochs 20 --out_dir "./kd_out"
+# python dt_logit.py --precompute_softlabels --out_dir "./kd_out"
+# python dt_logit.py --epochs 20 --img_size 224 224
 # -------------------------
 def main(args):
     img_size = (args.img_size[0], args.img_size[1])
