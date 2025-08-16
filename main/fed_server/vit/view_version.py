@@ -1,16 +1,7 @@
 import tensorflow as tf
 
 
-#conda info --envs
-#conda env create -f environment.yml -prefix E:\path\to\envs\tf_hub_env
-#conda create --name myenv --file spec-file.txt
-#conda remove --name tf_env --all
-#conda remove --prefix D:\conda_envs\tf_hub_env --all
-#conda list
-#conda list --explicit > spec-file.txt
-#conda env export > environment.yml
-#conda create -n tf_env python=3.9
-#conda activate tf_env
+
 #pip install tensorflow==2.12.0
 #pip uninstall tensorflow keras -y
 #pip cache purge

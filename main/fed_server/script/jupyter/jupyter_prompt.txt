@@ -1,0 +1,2 @@
+jupytext --to notebook your_script.py
+jupytext --set-formats ipynb,py your_notebook.ipynb

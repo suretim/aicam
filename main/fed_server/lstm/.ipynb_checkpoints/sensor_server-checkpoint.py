@@ -1,12 +1,26 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# ---
+# jupyter:
+#   jupytext:
+#     cell_metadata_filter: -all
+#     formats: ipynb,py:percent
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.17.2
+# ---
 
+# %%
+# %%
 import os
 import glob
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 
+# %%
 # ========= 可调参数 =========
 SEQ_LEN         = 128          # 每个样本的时间步长度
 NUM_FEATS       = 3            # 传感器通道数：例如 [temp, humid, light]
@@ -16,15 +30,18 @@ BATCH_SIZE      = 64
 EPOCHS          = 20
 LR              = 1e-3
 
+# %%
 # 是否同时训练一个小分类头（例如健康/异常二分类）
 WITH_CLASSIFIER = True
 NUM_CLASSES     = 2
 
+# %%
 # 数据路径（示例：data/*.csv，每行一条观测）
 DATA_GLOB       = "./data/*.csv"
 SAVE_DIR        = "./lstm_sensor_out"
 os.makedirs(SAVE_DIR, exist_ok=True)
 
+# %%
 # ========= 数据加载与切片 =========
 def load_csvs(glob_pattern):
     files = sorted(glob.glob(glob_pattern))
@@ -40,6 +57,7 @@ def load_csvs(glob_pattern):
         dfs.append((X,y))
     return dfs
 
+# %%
 def zscore_norm(x, mean=None, std=None, eps=1e-6):
     if mean is None:
         mean = x.mean(axis=0, keepdims=True)
@@ -48,6 +66,7 @@ def zscore_norm(x, mean=None, std=None, eps=1e-6):
     std = np.maximum(std, eps)
     return (x - mean) / std, mean, std
 
+# %%
 def make_windows(X, y, seq_len=SEQ_LEN, stride=None):
     """将长序列切成滑窗片段；若 y 存在，窗口的 y 取窗口末端的标签（或多数投票，自行改）"""
     if stride is None:
@@ -63,25 +82,50 @@ def make_windows(X, y, seq_len=SEQ_LEN, stride=None):
     ys = np.array(ys, dtype=np.int32) if y is not None else None
     return xs, ys
 
-def build_dataset(glob_pattern, with_labels=True):
+# %%
+import glob
+import numpy as np
+import pandas as pd
+
+def build_dataset_safe(glob_pattern, with_labels=True):
     all_X, all_y = [], []
-    for X, y in load_csvs(glob_pattern):
-        # 缺失值填充（前向填充，再整体均值兜底）
+    files = sorted(glob.glob(glob_pattern))
+    if len(files) == 0:
+        raise ValueError(f"No files found for pattern: {glob_pattern}")
+
+    for f in files:
+        print(f"Processing file: {f}")
+        if f.endswith(".csv"):
+            # CSV 文件
+            df = pd.read_csv(f)
+            cols = ["temp", "humid", "light"]
+            X = df[cols].values.astype(np.float32)
+            y = df["label"].values.astype(np.int32) if (with_labels and "label" in df.columns) else None
+        elif f.endswith(".npz"):
+            # npz 文件
+            data = np.load(f, allow_pickle=True)  # <- 避免 pickled 数据报错
+            X = data["X"].astype(np.float32)
+            y = data["y"].astype(np.int32) if (with_labels and "y" in data) else None
+        else:
+            print(f"Skipped unsupported file: {f}")
+            continue
+
+        # 缺失值处理（前向填充 + 均值兜底）
         if np.isnan(X).any():
-            # 简单前向填充
             for c in range(X.shape[1]):
                 col = X[:, c]
                 idx = np.where(np.isnan(col))[0]
                 for i in idx:
                     col[i] = col[i-1] if i > 0 else np.nan
-                # 若开头仍有 NaN，用列均值
                 if np.isnan(col).any():
-                    m = np.nanmean(col)
-                    col[np.isnan(col)] = m
+                    col[np.isnan(col)] = np.nanmean(col)
                 X[:, c] = col
 
-        Xn, _, _ = zscore_norm(X)  # 逐文件做 z-score（也可换成全局统计）
-        xs, ys = make_windows(Xn, y if with_labels else None, seq_len=SEQ_LEN)
+        # z-score 归一化
+        Xn, _, _ = zscore_norm(X)
+
+        # 滑窗
+        xs, ys = make_windows(Xn, y if with_labels else None)
         all_X.append(xs)
         if with_labels and ys is not None:
             all_y.append(ys)
@@ -91,8 +135,44 @@ def build_dataset(glob_pattern, with_labels=True):
         y_cat = np.concatenate(all_y, axis=0)
     else:
         y_cat = None
+
+    print(f"Built dataset: X={X_cat.shape}, y={None if y_cat is None else y_cat.shape}")
     return X_cat, y_cat
 
+def build_dataset(glob_pattern, with_labels):
+    all_X = []
+    all_y = [] if with_labels else None
+    
+    # 添加调试信息
+    print(f"Looking for files matching: {glob_pattern}")
+    file_list = glob.glob(glob_pattern)
+    print(f"Found {len(file_list)} files")
+    
+    for file in file_list:
+        print(f"Processing file: {file}")
+        data = np.load(file)
+        xs = data["X"]
+        print(f"Loaded X shape: {xs.shape}")
+        all_X.append(xs)
+        
+        if with_labels:
+            ys = data["y"] if "y" in data else None
+            if ys is not None:
+                all_y.append(ys)
+    
+    if len(all_X) == 0:
+        raise ValueError("No data was loaded - check your glob pattern and file contents")
+    
+    X_cat = np.concatenate(all_X, axis=0)
+    if with_labels and len(all_y) > 0:
+        y_cat = np.concatenate(all_y, axis=0)
+    else:
+        y_cat = None
+    
+    return X_cat, y_cat
+
+
+# %%
 # ========= 模型定义（TFLite Micro 友好）=========
 def build_lstm_encoder(num_feats=NUM_FEATS, seq_len=SEQ_LEN,
                        lstm_units=LSTM_UNITS, feature_dim=FEATURE_DIM):
@@ -113,6 +193,7 @@ def build_lstm_encoder(num_feats=NUM_FEATS, seq_len=SEQ_LEN,
     enc = tf.keras.Model(inp, feat, name="lstm_encoder")
     return enc
 
+# %%
 def build_full_model(with_classifier=WITH_CLASSIFIER):
     enc = build_lstm_encoder()
     if not with_classifier:
@@ -120,10 +201,11 @@ def build_full_model(with_classifier=WITH_CLASSIFIER):
     out = tf.keras.layers.Dense(NUM_CLASSES, activation=None, name="logits")(enc.output)
     return tf.keras.Model(enc.input, [enc.output, out], name="lstm_encoder_head")
 
+# %%
 # ========= 训练流程 =========
 def main():
     print("Loading data ...")
-    X, y = build_dataset(DATA_GLOB, with_labels=WITH_CLASSIFIER)
+    X, y = build_dataset_safe(DATA_GLOB, with_labels=WITH_CLASSIFIER)
     print("X:", X.shape, " y:", None if y is None else y.shape)
 
     # 训练/验证划分
@@ -180,43 +262,37 @@ def main():
 
     # ========= 导出 TFLite（Float32 & Int8）=========
     def save_tflite(keras_model, out_path, quant_int8=False, rep_data=None):
+        """
+        保存 TFLite 模型（FP32 或 INT8），支持 LSTM 使用 SELECT_TF_OPS。
+        """
         converter = tf.lite.TFLiteConverter.from_keras_model(keras_model)
-        if quant_int8:
-            converter.optimizations = [tf.lite.Optimize.DEFAULT]
-            assert rep_data is not None, "需要代表性数据做 Int8 量化"
-            def rep_dataset():
-                for i in range(min(200, len(rep_data))):
-                    # 每次 yield 一个样本（保持 float32，再由代表性校准）
-                    yield [rep_data[i:i+1]]
-            converter.representative_dataset = rep_dataset
-            converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
-            converter.inference_input_type  = tf.int8
-            converter.inference_output_type = tf.int8
-        else:
-            converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS]
-
+    
+         
+        # FP32 TFLite，解决 LSTM TensorList 问题
+        converter.target_spec.supported_ops = [
+            tf.lite.OpsSet.TFLITE_BUILTINS,
+            tf.lite.OpsSet.SELECT_TF_OPS
+        ]
+        # 禁用 experimental_lower_tensor_list_ops
+        converter._experimental_lower_tensor_list_ops = False
+    
         tflite_model = converter.convert()
         with open(out_path, "wb") as f:
             f.write(tflite_model)
         print("Saved:", out_path, " size:", os.path.getsize(out_path)/1024, "KB")
 
-    # 以“仅编码器”导出
     encoder_keras = tf.keras.models.load_model(os.path.join(SAVE_DIR, "lstm_encoder.h5"))
-
-    # Float32（最稳妥，先用于 ESP32-S3 验证）
+    
+    # FP32
     save_tflite(encoder_keras, os.path.join(SAVE_DIR, "lstm_encoder_fp32.tflite"))
-
-    # Int8（需注意：TFLite Micro 的 INT8 LSTM 在不同版本的可用性与精度）
-    # 用训练集的一小部分做代表性数据
-    rep = X_train if len(X_train) > 0 else X[:256]
-    if len(rep) > 0:
-        save_tflite(encoder_keras, os.path.join(SAVE_DIR, "lstm_encoder_int8.tflite"),
-                    quant_int8=True, rep_data=rep)
+     
+ 
 
     # 同时导出带分类头（可选）
     if WITH_CLASSIFIER:
         head_keras = tf.keras.models.load_model(os.path.join(SAVE_DIR, "lstm_encoder_head.h5"))
         save_tflite(head_keras, os.path.join(SAVE_DIR, "lstm_encoder_head_fp32.tflite"))
 
+# %%
 if __name__ == "__main__":
     main()

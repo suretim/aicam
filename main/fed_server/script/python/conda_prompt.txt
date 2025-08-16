@@ -1,0 +1,12 @@
+#conda info --envs
+#conda env create -f environment.yml -prefix E:\path\to\envs\tf_hub_env
+#conda create --name myenv --file spec-file.txt
+#conda env update -f environment_myenv.yml --prune
+#conda remove --name tf_env --all
+conda remove -n myenv --all -y
+#conda remove --prefix D:\conda_envs\tf_hub_env --all
+#conda list
+#conda list --explicit > spec-file.txt
+#conda env export > environment.yml
+#conda create -n tf_env python=3.9
+#conda activate tf_env

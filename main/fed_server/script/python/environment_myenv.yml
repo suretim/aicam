@@ -1,4 +1,4 @@
-name: fl_env  # Conda 环境的名称
+name: myenv  # Conda 环境的名称
 channels:
   - defaults  # 默认的 Conda 渠道
   - conda-forge  # Conda 的社区源，提供更多包
@@ -13,4 +13,6 @@ dependencies:
       - paho-mqtt==1.6.1
       - tensorflow==2.13.0
       - numpy==1.23.5
-  - cudatoolkit=11.8  # 如果你有支持的 NVIDIA GPU，可以启用 CUDA 支持
+      - pandas
+      - glob
+  #- cudatoolkit=11.8  # 如果你有支持的 NVIDIA GPU，可以启用 CUDA 支持
