@@ -29,35 +29,7 @@ Export student encoder -> TFLite + export classifier weights to C header + bin.
 
 import sys
 import subprocess
-
-
-# 检测并自动修复 NumPy/TensorFlow 版本
-def ensure_numpy_tf_compat():
-    try:
-        import tensorflow as tf
-        import numpy as np
-    except ImportError:
-        return  # 如果没装，后面会提示
-
-    tf_version = tuple(map(int, tf.__version__.split(".")[:2]))
-    np_version = tuple(map(int, np.__version__.split(".")[:2]))
-
-    if tf_version < (2, 16) and np_version >= (2, 0):
-        print(f"[WARN] Detected TensorFlow {tf.__version__} + NumPy {np.__version__}, "
-              f"this will cause '_ARRAY_API not found'.")
-        print("[INFO] Auto-downgrading NumPy to 1.26.4 for compatibility...")
-
-        # 执行 pip 安装
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "numpy==1.26.4", "--upgrade"])
-
-        print("[INFO] NumPy downgraded. Restarting script...")
-        # 重启当前脚本
-        os.execv(sys.executable, [sys.executable] + sys.argv)
-
-
-# 先检测修复
-ensure_numpy_tf_compat()
-
+ 
 # 现在安全导入
 import tensorflow as tf
 import numpy as np
@@ -187,7 +159,7 @@ def main(args):
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
-    p.add_argument("--student_h5", required=True)
+    p.add_argument("--student_h5", default="student.h5")
     p.add_argument("--encoder_tflite", default="student_encoder_fp32.tflite")
     p.add_argument("--classifier_h", default="classifier_weights.h")
     p.add_argument("--classifier_bin", default="classifier_weights.bin")

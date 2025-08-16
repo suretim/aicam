@@ -144,44 +144,10 @@ TfLiteStatus loop() {
   //vTaskDelay(1); // to avoid watchdog trigger
   return kTfLiteOk;
 } 
-
-void set_up_student() {
-    // 加载模型
-    const tflite::Model* model = tflite::GetModel(student_model_tflite);
-    if (model->version() != TFLITE_SCHEMA_VERSION) {
-        printf("Model schema version mismatch!\n");
-        return;
-    }
-
-    // 注册算子
-    static tflite::AllOpsResolver resolver;
-
-    // 创建解释器
-    static tflite::MicroInterpreter interpreter(model, resolver, tensor_arena, kTensorArenaSize);
-    interpreter.AllocateTensors(); 
-    // 获取输入输出
-     input = interpreter.input(0);
-     output = interpreter.output(0);  
-
-    if (kTfLiteOk != loop()) {
-      MicroPrintf("Image loop failed.");
-      return kTfLiteError;
-    } 
  
-    ESP_LOGI(TAG, "推理完成，系统正常运行");
-    // 输出结果
-    //printf("Predictions:\n");
-    //for (int i = 0; i < output->dims->data[1]; i++) {
-    //    printf("Class %d: %f\n", i, output->data.f[i]);
-    //}
-}
-
-
-
 
 extern const unsigned char encoder_model_float[]  asm("_binary_student_fp32_tflite_start");
-extern const unsigned char student_model_tflite[] asm("_binary_student_model_tflite_start");
-
+ 
 // The name of this function is important for Arduino compatibility.
 TfLiteStatus setup(void) {
     // Map the model into a usable data structure. This doesn't involve any
@@ -293,3 +259,23 @@ void tensor_task(void *arg)
    
 }
  
+
+int run_encoder(const float* image_data, float* feature_out) {
+    // Copy input
+    int n = input_tensor->bytes / sizeof(float);
+    for (int i = 0; i < n; i++) input_tensor->data.f[i] = image_data[i];
+
+    if (interpreter->Invoke() != kTfLiteOk) {
+        printf("Invoke failed\n");
+        return -1;
+    }
+    // output_tensor->data.f length should match FEATURE_DIM
+    int out_n = output_tensor->bytes / sizeof(float);
+    if (out_n != FEATURE_DIM) {
+        printf("Warning: output feature dim mismatch: %d vs %d\n", out_n, FEATURE_DIM);
+    }
+    for (int i = 0; i < FEATURE_DIM && i < out_n; i++) {
+        feature_out[i] = output_tensor->data.f[i];
+    }
+    return 0;
+}
