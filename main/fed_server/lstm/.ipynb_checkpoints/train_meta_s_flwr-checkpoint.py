@@ -87,13 +87,26 @@ class NTXentLoss(tf.keras.losses.Loss):
         loss_i = tf.keras.losses.sparse_categorical_crossentropy(labels, logits, from_logits=True)
         loss_j = tf.keras.losses.sparse_categorical_crossentropy(labels, tf.transpose(logits), from_logits=True)
         return tf.reduce_mean(loss_i + loss_j)
-
+# =============================
+# 2) LSTM Encoder (unroll=True)
+# =============================
 def build_lstm_encoder(seq_len, num_feats, feature_dim=FEATURE_DIM):
     inp = layers.Input(shape=(seq_len, num_feats))
-    x = layers.LSTM(feature_dim)(inp)
+    # 關鍵：unroll=True，避免 TensorList
+    x = layers.LSTM(feature_dim, unroll=True)(inp)
     out = layers.Dense(feature_dim, activation="relu")(x)
     return models.Model(inp, out, name="lstm_encoder")
 
+# =============================
+# 3) Meta Model (使用 Encoder)
+# =============================
+def build_meta_model(encoder, num_classes=NUM_CLASSES):
+    inp = layers.Input(shape=(SEQ_LEN, NUM_FEATS))
+    x = encoder(inp)
+    x = layers.Dense(32, activation="relu")(x)
+    out = layers.Dense(num_classes, activation="softmax")(x)
+    return models.Model(inp, out, name="meta_lstm_classifier")
+ 
 lstm_encoder = build_lstm_encoder(SEQ_LEN, NUM_FEATS, FEATURE_DIM)
 contrastive_opt = tf.keras.optimizers.Adam()
 ntxent = NTXentLoss(temperature=0.2)
@@ -115,16 +128,7 @@ for ep in range(EPOCHS_CONTRASTIVE):
         contrastive_opt.apply_gradients(zip(grads, lstm_encoder.trainable_variables))
     contrastive_loss_history.append(float(loss.numpy()))
     print(f"[Contrastive] Epoch {ep+1}/{EPOCHS_CONTRASTIVE}, loss={float(loss.numpy()):.4f}")
-
-# =============================
-# 3) FOMAML + LLL + EWC + 花期梯度加權
-# =============================
-def build_meta_model(encoder, num_classes=NUM_CLASSES):
-    inp = layers.Input(shape=(SEQ_LEN, NUM_FEATS))
-    x = encoder(inp)
-    x = layers.Dense(32, activation="relu")(x)
-    out = layers.Dense(num_classes, activation="softmax")(x)
-    return models.Model(inp, out, name="meta_lstm_classifier")
+ 
 
 meta_model = build_meta_model(lstm_encoder, NUM_CLASSES)
 meta_optimizer = tf.keras.optimizers.Adam(META_LR)
@@ -270,14 +274,25 @@ if meta_loss_history:
 # =============================
 # 5) TFLite 导出
 # =============================
+
+# =============================
+# 5) TFLite 导出 (僅允許內建算子)
+# =============================
 def save_tflite(model, out_path):
     converter = tf.lite.TFLiteConverter.from_keras_model(model)
-    converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS, tf.lite.OpsSet.SELECT_TF_OPS]
+    # 僅允許 MCU 支援的內建算子
+    converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS]
+    # 如果需要 float16 量化：
+    # converter.optimizations = [tf.lite.Optimize.DEFAULT]
+    # converter.target_spec.supported_types = [tf.float16]
     tflite_model = converter.convert()
     with open(out_path, "wb") as f:
         f.write(tflite_model)
     print("Saved TFLite:", out_path)
 
+# 最後保存
 save_tflite(lstm_encoder, "lstm_encoder_contrastive.tflite")
 if X_labeled.size > 0:
     save_tflite(meta_model, "meta_lstm_classifier.tflite")
+ 
+ 
