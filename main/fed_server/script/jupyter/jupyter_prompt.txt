@@ -1,2 +1,10 @@
 jupytext --to notebook your_script.py
 jupytext --set-formats ipynb,py your_notebook.ipynb
+
+conda activate myenv
+conda install ipykernel -y
+conda install ipython -y
+conda install jupyter_client -y
+python -m ipykernel install --name=myenv2 --display-name "myenv2" --sys-prefix
+jupyter kernelspec list
+start-notebook.sh --NotebookApp.token='' --NotebookApp.allow_root=True

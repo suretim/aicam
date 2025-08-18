@@ -65,8 +65,9 @@ docker run -it --gpus all -v C:\Users\你的用户名\projects:/workspace pytorc
 
 # 进入 TensorFlow GPU 容器
 jupyter lab --ip=0.0.0.0 --no-browser --allow-root
-docker run -it --gpus all -v C:\tim:/workspace tensorflow/tensorflow:2.14.0-gpu bash
-conda run -n jupyter_env python -m ipykernel install --name my_env --display-name "my_env" --sys-prefix
-docker run -p 8888:8888 -v C:/tim:/home/jovyan/work jupyter/base-notebook
-docker exec -dit --user root jupyter_env /bin/bash -c "start-notebook.sh --NotebookApp.token='' --NotebookApp.allow_root=True"
---NotebookApp.allow_origin="*"
+docker run -dit --gpus all -v C:\tim:/workspace tensorflow/tensorflow:2.14.0-gpu bash
+conda run -n myenv python -m ipykernel install --name my_env --display-name "my_env" --sys-prefix
+
+docker run -dit  --user root jupyter_env -p 9999:8888 -v C:/tim:/home/jovyan/work jupyter/base-notebook -c "start-notebook.sh --NotebookApp.token='' --NotebookApp.allow_root=True"
+docker exec -dit --user root jupyter_env /bin/bash 
+docker run -dit --user root -p 8888:8888 -v C:/tim:/home/jovyan/work jupyter/base-notebook start-notebook.sh --NotebookApp.token='' --NotebookApp.allow_root=True
