@@ -1,18 +1,11 @@
-set(PROTO_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../proto")
-set(PROTO_PB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../components/nanopb")
-set(PROTO_SRCS
-    ${PROTO_SRC_DIR}/model.pb.c
-)
 
-set(PROTO_HDRS
-    ${PROTO_SRC_DIR}/model.pb.h
-)
- 
 
 if(0) 
-#if("${IDF_VERSION_MAJOR}.${IDF_VERSION_MINOR}" VERSION_LESS  "5.0") 
-
-idf_component_register(
+    set(PROTO_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../proto")
+    set(PROTO_PB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../components/nanopb")
+    set(PROTO_SRCS ${PROTO_SRC_DIR}/model.pb.c ) 
+    set(PROTO_HDRS ${PROTO_SRC_DIR}/model.pb.h )  
+    idf_component_register(
         PRIV_INCLUDE_DIRS "." ${PROTO_PB_DIR} ${PROTO_SRC_DIR}        
         #for http_web
         #SRCS  "main_grpc_client.cpp" "http_web.cpp" "img_inference.cc" "config_wifi.cc" "classifier.cc" 
@@ -39,8 +32,9 @@ idf_component_register(
         EMBED_FILES 
             "web_content/index_http.html" 
             "web_content/index_socket.html" 
-            "web_content/index_ecm.html" 
-            "fed_server/vit/student_fp32.tflite"
+            "web_content/index_ecm.html"
+            "fed_server/vit/student_fp32.tflite" 
+            
           
         #PRIV_REQUIRES mqtt nvs_flash esp_psram esp_http_server console esp_netif esp_http_server esp_wifi esp32-camera esp-tflite-micro esp_timer cjson lwip esp_eth driver
         PRIV_REQUIRES 
@@ -57,11 +51,27 @@ idf_component_register(
             tflite-micro 
             json
         
-        ) 
+    ) 
 else()
-idf_component_register(SRCS "nvs_model.cc"
-                       INCLUDE_DIRS "."
-                       REQUIRES tflite-micro nvs_flash)
+    set(TFLITE_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/fed_server/lstm")
+    set(TFLITE_LSTM_SRCS "${TFLITE_SRC_DIR}/lstm_encoder_contrastive.tflite"  )
+    set(TFLITE_META_SRCS "${TFLITE_SRC_DIR}/meta_lstm_classifier.tflite"   )
+    idf_component_register(
+        SRCS 
+            "main_lll.cpp"            
+            "infer_esp32_lstm_lll.cc"
+        INCLUDE_DIRS 
+            "."      
+        EMBED_FILES          
+            ${TFLITE_LSTM_SRCS} 
+            ${TFLITE_META_SRCS}             
+        PRIV_REQUIRES 
+            tflite-micro 
+            nvs_flash
+            #"fed_server/vit/student_fp32.tflite"
+            #"fed_server/lstm/lstm_encoder_contrastive.tflite"
+            #"../fed_server/lstm/meta_lstm_classifier.tflite"
+        )
 endif()
 #$env:IDF_COMPONENT_MANAGER="enabled"
 #https://components.espressif.com/api/

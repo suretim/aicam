@@ -11,7 +11,7 @@
 #include "esp_log.h"
 #include <esp_task_wdt.h>
  
-static const char *TAG = "NVS_MODEL";
+static const char *TAG = "MAIN_LLL";
 
 // Include model_data.h produced by xxd -i student_encoder_fp32.tflite > model_data.h
 //#include "model_data.h"
@@ -142,15 +142,39 @@ void mqtt_on_message(const uint8_t* payload, size_t payload_len) {
         printf("MQTT classifier update failed.\n");
     }
 }
-
+extern void lll_tensor_run();
 // Example main demonstrating flow
 extern "C" void app_main(void) {
-    // init NVS
-    esp_err_t e = nvs_flash_init();
-    if (e == ESP_ERR_NVS_NO_FREE_PAGES || e == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        nvs_flash_erase();
-        nvs_flash_init();
+ 
+ 
+
+
+// First try standard initialization
+esp_err_t ret = nvs_flash_init();
+
+// Handle common initialization errors
+if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+    // NVS needs to be erased
+    ESP_ERROR_CHECK(nvs_flash_erase());
+    ret = nvs_flash_init();
+}
+ESP_ERROR_CHECK(ret);
+
+// For persistent error 4354, add deeper recovery:
+if (ret == 4354) {  // Or use ESP_ERR_NVS_xxx equivalent
+    printf("NVS Corruption Detected. Performing deep recovery...\n");
+    nvs_flash_deinit();
+    const esp_partition_t* nvs_partition = esp_partition_find_first(
+        ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_NVS, NULL);
+    if (nvs_partition) {
+        esp_partition_erase_range(nvs_partition, 0, nvs_partition->size);
     }
+    ret = nvs_flash_init();
+}
+
+
+
+
 
     // initialize classifier default from header if compiled in
     init_classifier_from_header();
@@ -159,7 +183,7 @@ extern "C" void app_main(void) {
     restore_classifier_from_nvs();
 
     // init tflite
-    //tflite_init();
+    lll_tensor_run();
 
     // Now in your app loop you would:
     // - capture image, preprocess to float array matching TFLite input
