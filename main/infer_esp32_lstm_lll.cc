@@ -89,7 +89,7 @@ TfLiteStatus run_inference(float* input_seq, int seq_len, int num_feats, float* 
       return kTfLiteError;
     }
  
-    tflite::MicroMutableOpResolver<18> micro_op_resolver;
+    tflite::MicroMutableOpResolver<20> micro_op_resolver;
     micro_op_resolver.AddStridedSlice();
     micro_op_resolver.AddPack();
     micro_op_resolver.AddConv2D();
@@ -109,7 +109,7 @@ TfLiteStatus run_inference(float* input_seq, int seq_len, int num_feats, float* 
     micro_op_resolver.AddFill();
     micro_op_resolver.AddSplit(); 
     micro_op_resolver.AddLogistic();  // This handles sigmoid activation
-
+micro_op_resolver.AddTanh();
 
   static tflite::MicroInterpreter static_interpreter(
       model, micro_op_resolver, tensor_arena, kTensorArenaSize);

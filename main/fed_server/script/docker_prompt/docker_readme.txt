@@ -69,5 +69,6 @@ docker run -dit --gpus all -v C:\tim:/workspace tensorflow/tensorflow:2.14.0-gpu
 conda run -n myenv python -m ipykernel install --name my_env --display-name "my_env" --sys-prefix
 
 docker run -dit  --user root jupyter_env -p 9999:8888 -v C:/tim:/home/jovyan/work jupyter/base-notebook -c "start-notebook.sh --NotebookApp.token='' --NotebookApp.allow_root=True"
-docker exec -dit --user root 5e35f88 /bin/bash 
+docker exec -dit --user root jupyter_env /bin/bash 
 docker run -dit --user root -p 8888:8888 -v C:/tim:/home/jovyan/work jupyter/base-notebook start-notebook.sh --NotebookApp.token='' --NotebookApp.allow_root=True
+docker exec -dit --user root jupyter_env /bin/bash start-notebook.sh --NotebookApp.token='' --NotebookApp.allow_root=True 

@@ -10,7 +10,7 @@
 #include <sstream>
 #include "esp_log.h"
 #include <esp_task_wdt.h>
- 
+  
 static const char *TAG = "MAIN_LLL";
 
 // Include model_data.h produced by xxd -i student_encoder_fp32.tflite > model_data.h
@@ -77,7 +77,39 @@ void softmax(const float* logits, float* probs_out) {
     }
     for (int i = 0; i < NUM_CLASSES; i++) probs_out[i] /= sum;
 }
-  
+ 
+ 
+
+void initialize_nvs_robust() {
+    ESP_LOGI(TAG, "Initializing NVS with robust error handling...");
+    
+    // 首先尝试正常初始化
+    esp_err_t err = nvs_flash_init();
+    
+    // 处理常见的 NVS 错误
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_LOGW(TAG, "NVS partition corrupted, erasing...");
+        
+        // 完全擦除 NVS 分区
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        
+        // 重新初始化
+        err = nvs_flash_init();
+    }
+    
+    // 如果还有其他错误
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "NVS initialization failed: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "This is a critical error, restarting...");
+        
+        // 等待一段时间让日志输出
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        esp_restart();
+    }
+    
+    ESP_LOGI(TAG, "NVS initialized successfully");
+}
+ 
 // Example: update classifier weights from downloaded binary buffer
 // Binary layout expected: weights (float32 raw) length FEATURE_DIM * NUM_CLASSES, then bias length NUM_CLASSES
 // data: pointer to bytes, len: number of bytes
@@ -105,33 +137,103 @@ int update_classifier_from_bin(const uint8_t* data, size_t len) {
     printf("Classifier updated from binary. Persisted to NVS.\n");
     return 0;
 }
-
-// Restore classifier weights from NVS if present
-void restore_classifier_from_nvs() {
-    nvs_handle_t h;
-    esp_err_t err = nvs_open("model", NVS_READONLY, &h);
-    if (err != ESP_OK) {
-        printf("NVS open read err %d\n", err);
-        return;
+//esptool.py --port COM5 erase_flash
+ // Restore classifier weights from NVS if present - UPDATED API
+ 
+// 安全的命名空间检查函数
+bool check_namespace_exists(const char* namespace_name) {
+    nvs_iterator_t it = NULL;
+    esp_err_t err = nvs_entry_find("nvs", namespace_name, NVS_TYPE_ANY, &it);
+    
+    bool exists = (err == ESP_OK && it != NULL);
+    
+    if (it != NULL) {
+        nvs_release_iterator(it);
     }
-    size_t required = 0;
-    err = nvs_get_blob(h, "clf_bin", NULL, &required);
-    if (err != ESP_OK || required == 0) {
-        printf("No classifier in NVS\n");
-        nvs_close(h);
-        return;
-    }
-    uint8_t* buf =(uint8_t*) malloc(required);
-    if (!buf) { nvs_close(h); return; }
-    err = nvs_get_blob(h, "clf_bin", buf, &required);
-    if (err == ESP_OK) {
-        update_classifier_from_bin(buf, required); // this will persist again but OK
-    }
-    free(buf);
-    nvs_close(h);
+    
+    return exists;
 }
 
-// Example MQTT callback (pseudo): receives classifier_weights.bin as payload
+// 调试函数：列出所有命名空间和键
+void debug_nvs_contents() {
+    nvs_iterator_t it = NULL;
+    esp_err_t err = nvs_entry_find("nvs", NULL, NVS_TYPE_ANY, &it);
+    
+    if (err != ESP_OK) {
+        ESP_LOGI("NVS_DEBUG", "No entries found in NVS");
+        return;
+    }
+    
+    ESP_LOGI("NVS_DEBUG", "NVS contents:");
+    
+    while (err == ESP_OK) {
+        nvs_entry_info_t info;
+        nvs_entry_info(it, &info);
+        
+        ESP_LOGI("NVS_DEBUG", "  Namespace: %s, Key: %s, Type: %d", 
+                info.namespace_name, info.key, info.type);
+        
+        err = nvs_entry_next(&it);
+    }
+    
+    nvs_release_iterator(it);
+}
+
+
+void restore_classifier_from_nvs() {
+    ESP_LOGI("NVS", "Attempting to restore classifier from NVS...");
+    
+    nvs_handle_t h;
+    esp_err_t err = nvs_open("model", NVS_READONLY, &h);
+    
+    if (err != ESP_OK) {
+        ESP_LOGW("NVS", "nvs_open failed: %s - This is normal on first boot", esp_err_to_name(err));
+        return;
+    }
+    
+    // 确保句柄会被关闭
+    auto handle_cleanup = [&h]() { nvs_close(h); };
+    
+    size_t required = 0;
+    err = nvs_get_blob(h, "clf_bin", NULL, &required);
+    
+    if (err != ESP_OK) {
+        ESP_LOGW("NVS", "Classifier blob not found: %s", esp_err_to_name(err));
+        handle_cleanup();
+        return;
+    }
+    
+    if (required == 0) {
+        ESP_LOGW("NVS", "Classifier blob exists but size is 0");
+        handle_cleanup();
+        return;
+    }
+    
+    ESP_LOGI("NVS", "Found classifier blob, size: %d bytes", required);
+    
+    uint8_t* buf = (uint8_t*) malloc(required);
+    if (!buf) {
+        ESP_LOGE("NVS", "Memory allocation failed for %d bytes", required);
+        handle_cleanup();
+        return;
+    }
+    
+    // 确保内存会被释放
+    auto buffer_cleanup = [buf]() { free(buf); };
+    
+    err = nvs_get_blob(h, "clf_bin", buf, &required);
+    if (err == ESP_OK) {
+        ESP_LOGI("NVS", "Successfully read classifier data");
+        update_classifier_from_bin(buf, required);
+    } else {
+        ESP_LOGE("NVS", "Failed to read blob data: %s", esp_err_to_name(err));
+    }
+    
+    buffer_cleanup();
+    handle_cleanup();
+    ESP_LOGI("NVS", "Classifier restore process completed");
+}
+ // Example MQTT callback (pseudo): receives classifier_weights.bin as payload
 // In real code wire up esp-mqtt and call this when message arrives
 void mqtt_on_message(const uint8_t* payload, size_t payload_len) {
     // payload should be raw float32 bytes as produced by export script
@@ -142,46 +244,70 @@ void mqtt_on_message(const uint8_t* payload, size_t payload_len) {
         printf("MQTT classifier update failed.\n");
     }
 }
+
+ 
+
+void initialize_nvs() {
+    ESP_LOGI(TAG, "Initializing NVS...");
+    
+    // 尝试初始化 NVS
+    esp_err_t err = nvs_flash_init();
+    
+    // 如果 NVS 分区损坏
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_LOGW(TAG, "NVS partition corrupted, erasing and recreating...");
+        
+        // 完全擦除 NVS 分区
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        
+        // 重新初始化
+        err = nvs_flash_init();
+    }
+    
+    // 检查最终结果
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "NVS initialization failed: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "Restarting in 5 seconds...");
+        vTaskDelay(pdMS_TO_TICKS(5000));
+        esp_restart();
+    }
+    
+    ESP_LOGI(TAG, "NVS initialized successfully");
+}
+ 
+// 全局异常保护
+void safe_nvs_operation() {
+    // 设置看门狗
+    UBaseType_t stack_watermark = uxTaskGetStackHighWaterMark(NULL);
+    ESP_LOGI("SAFE", "Stack watermark: %d", stack_watermark);
+    
+    // 检查内存
+    size_t free_heap = esp_get_free_heap_size();
+    ESP_LOGI("SAFE", "Free heap: %d bytes", free_heap);
+    
+    if (free_heap < 10240) { // 少于 10KB
+        ESP_LOGE("SAFE", "Critical: Low memory, skipping NVS operations");
+        return;
+    }
+    
+    // 执行安全的 NVS 操作
+    restore_classifier_from_nvs();
+}
 extern void lll_tensor_run();
 // Example main demonstrating flow
 extern "C" void app_main(void) {
  
  
-
-
-// First try standard initialization
-esp_err_t ret = nvs_flash_init();
-
-// Handle common initialization errors
-if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-    // NVS needs to be erased
-    ESP_ERROR_CHECK(nvs_flash_erase());
-    ret = nvs_flash_init();
-}
-ESP_ERROR_CHECK(ret);
-
-// For persistent error 4354, add deeper recovery:
-if (ret == 4354) {  // Or use ESP_ERR_NVS_xxx equivalent
-    printf("NVS Corruption Detected. Performing deep recovery...\n");
-    nvs_flash_deinit();
-    const esp_partition_t* nvs_partition = esp_partition_find_first(
-        ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_NVS, NULL);
-    if (nvs_partition) {
-        esp_partition_erase_range(nvs_partition, 0, nvs_partition->size);
-    }
-    ret = nvs_flash_init();
-}
-
-
-
-
+ //initialize_nvs();
+  
+initialize_nvs_robust();
 
     // initialize classifier default from header if compiled in
     init_classifier_from_header();
 
     // restore persisted classifier if any
-    restore_classifier_from_nvs();
-
+    //restore_classifier_from_nvs();
+    safe_nvs_operation() ;
     // init tflite
     lll_tensor_run();
 
