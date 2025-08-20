@@ -1,29 +1,35 @@
-#include "classifier.h"
-#include "mqtt_client.h"
+#include "classifier.h" 
 
 #include "esp_log.h" 
 #include <string>
 #include <sstream>
 #include <stdlib.h> 
 #include <math.h>
- 
-#define CLASSIFIER_INPUT_DIM 64
-#define CLASSIFIER_OUTPUT_DIM 3
+  
+
+#include <string.h>
+
 
 // 全局变量保存权重和偏置（可以从 protobuf 接收到的参数更新）
 float g_dense_weights[CLASSIFIER_OUTPUT_DIM][CLASSIFIER_INPUT_DIM];
 float g_dense_bias[CLASSIFIER_OUTPUT_DIM];
 
-
-
-// float g_weights[CLASSIFIER_OUTPUT_DIM][CLASSIFIER_INPUT_DIM];
-// float g_bias[CLASSIFIER_OUTPUT_DIM];
-// void classifier_set_params(const float *weights, const float *bias, int input_dim, int output_dim) 
-// {
-//     memcpy(g_weights, weights, sizeof(g_weights));
-//     memcpy(g_bias, bias, sizeof(g_bias));
-//     return;
-// }
+//float fisher_matrix[FISHER_LAYER*CLASSIFIER_INPUT_DIM];
+//float theta[FISHER_LAYER*CLASSIFIER_INPUT_DIM];
+ 
+ float *fisher_matrix ;   // 每个变量的 Fisher 数组
+ float *theta ;    // 上一次权重
+//float *theta_old ;    // 上一次权重
+constexpr int FisherArenaSize = FISHER_LAYER * 256 *sizeof(float); // 调整大小
+void alloc_fisher_matrix()
+{
+    if (fisher_matrix == NULL) {
+        fisher_matrix = (uint8_t*) heap_caps_malloc(FisherArenaSize, MALLOC_CAP_SPIRAM);
+    }
+    if (theta == NULL) {
+        theta = (uint8_t*) heap_caps_malloc(FisherArenaSize, MALLOC_CAP_SPIRAM);
+    }
+}
 
 static float softmax(float x[], int len, int *out_index) {
     float max = x[0];
@@ -50,7 +56,7 @@ static float softmax(float x[], int len, int *out_index) {
     if (out_index) *out_index = max_idx;
     return max_prob;
 }
-void publish_feature_vector(int label );
+void publish_feature_vector(int label ,int type);
 int classifier_predict(const float *features) {
     float logits[CLASSIFIER_OUTPUT_DIM] = {0};
     for (int i = 0; i < CLASSIFIER_OUTPUT_DIM; ++i) {
@@ -62,37 +68,63 @@ int classifier_predict(const float *features) {
 
     int predicted_class = 0;
     softmax(logits, CLASSIFIER_OUTPUT_DIM, &predicted_class);
-    publish_feature_vector(predicted_class);
+    publish_feature_vector(predicted_class,0);
     return predicted_class;
 } 
  
 
 // 更新分类器的权重和偏置
-void update_classifier_weights(const float* values, int value_count) {
+void update_classifier_weights_bias(const float* values, int value_count,int type) {
+    
+    
     int expected = CLASSIFIER_OUTPUT_DIM * CLASSIFIER_INPUT_DIM ;
+    if(type==1)
+    {
+        expected=CLASSIFIER_OUTPUT_DIM;
+    }
+    
     if (value_count != expected) {
         printf("权重参数数量不匹配，期望 %d，实际 %d\n", expected, value_count);
         return;
     }
-
-    // 前 NUM_CLASSES * NUM_INPUTS 是权重
-    for (int i = 0; i < CLASSIFIER_OUTPUT_DIM; ++i) {
-        for (int j = 0; j < CLASSIFIER_INPUT_DIM; ++j) {
-            g_dense_weights[i][j] = values[i * CLASSIFIER_INPUT_DIM + j];
+    if(type==0)
+    {
+        // 前 NUM_CLASSES * NUM_INPUTS 是权重
+        for (int i = 0; i < CLASSIFIER_OUTPUT_DIM; ++i) {
+            for (int j = 0; j < CLASSIFIER_INPUT_DIM; ++j) {
+                g_dense_weights[i][j] = values[i * CLASSIFIER_INPUT_DIM + j];
+            }
         }
     }
+    else{    
+        // 后 NUM_CLASSES 是 bias
+        for (int i = 0; i < CLASSIFIER_OUTPUT_DIM; ++i) {
+            g_dense_bias[i] = values[ i];
+        }
+    }
+
 }
-void update_classifier_bias(const float* values, int value_count) {
-    int expected =  CLASSIFIER_OUTPUT_DIM ;
+void update_fishermatrix_theta(const float* values, int value_count,int type) {
+    int expected = sizeof(fisher_matrix)/sizeof(float);
+    
+    if(type==0)
+    {
+        expected=sizeof(theta)/sizeof(float);
+    }
     if (value_count != expected) {
         printf("权重参数数量不匹配，期望 %d，实际 %d\n", expected, value_count);
         return;
     }
-
-    // 后 NUM_CLASSES 是 bias
-    for (int i = 0; i < CLASSIFIER_OUTPUT_DIM; ++i) {
-        g_dense_bias[i] = values[ i];
+    if(type==0)
+    {
+        memcpy(fisher_matrix, values, sizeof(fisher_matrix));
+        return;
     }
+    else{
+        memcpy(theta, values, sizeof(theta));
+        return;    
+    }
+     
 
     printf("分类器权重更新完成\n");
 }

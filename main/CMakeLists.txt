@@ -1,10 +1,10 @@
 
-
-if(0) 
-    set(PROTO_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../proto")
+set(PROTO_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../proto")
     set(PROTO_PB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../components/nanopb")
     set(PROTO_SRCS ${PROTO_SRC_DIR}/model.pb.c ) 
-    set(PROTO_HDRS ${PROTO_SRC_DIR}/model.pb.h )  
+    set(PROTO_HDRS ${PROTO_SRC_DIR}/model.pb.h )
+if(0) 
+      
     idf_component_register(
         PRIV_INCLUDE_DIRS "." ${PROTO_PB_DIR} ${PROTO_SRC_DIR}        
         #for http_web
@@ -53,21 +53,31 @@ if(0)
         
     ) 
 else()
+    #target_link_libraries(${COMPONENT_LIB} PRIVATE spiffs)
     set(TFLITE_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/fed_server/lstm")
-    set(TFLITE_LSTM_SRCS "${TFLITE_SRC_DIR}/lstm_encoder_contrastive.tflite"  )
+     
     set(TFLITE_META_SRCS "${TFLITE_SRC_DIR}/meta_lstm_classifier.tflite"   )
     idf_component_register(
         SRCS 
-            "main_lll.cpp"            
+            "main_lll.cpp"   
+            "config_mqtt.cpp"    
+            "classifier_storage.cc"  
+            "classifier.cc"   
             "infer_esp32_lstm_lll.cc"
-        INCLUDE_DIRS 
-            "."      
+
+        PRIV_INCLUDE_DIRS "." ${PROTO_PB_DIR} ${PROTO_SRC_DIR}     
         EMBED_FILES          
-            ${TFLITE_LSTM_SRCS} 
             ${TFLITE_META_SRCS}             
         PRIV_REQUIRES 
             tflite-micro 
             nvs_flash
+            esp_psram
+            esp_wifi
+            mqtt
+            nanopb
+            #"spiffs"
+            console
+            json
             #"fed_server/vit/student_fp32.tflite"
             #"fed_server/lstm/lstm_encoder_contrastive.tflite"
             #"../fed_server/lstm/meta_lstm_classifier.tflite"

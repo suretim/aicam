@@ -13,11 +13,12 @@
 //#define NUM_CLASSES 2
 //#define EMBEDDING_DIM 64
 #define TAG "MQTT"
-#if 1
+#if 0
     //#define MQTT_BROKER_URI "mqtt://192.168.133.129:1883"
     #define MQTT_BROKER_URI "mqtt://192.168.68.237:1883"
 #else
-    #define MQTT_BROKER_URI "mqtt://192.168.0.57:1883"
+    //#define MQTT_BROKER_URI "mqtt://192.168.0.57:1883"
+    #define MQTT_BROKER_URI "mqtt://127.0.0.1:1883"
 #endif
 #define MQTT_USERNAME "tim"
 #define MQTT_PASSWORD "tim"
@@ -59,7 +60,7 @@ uint32_t get_client_id()
 }
 
 // 将 float 数组格式化为 JSON 并上传
-void publish_feature_vector(int label ) {
+void publish_feature_vector(int label,int type ) {
     std::stringstream ss;
     //int label=1;
     //int client_id=1;
@@ -71,8 +72,45 @@ void publish_feature_vector(int label ) {
         if (i != DENSE_IN_FEATURES - 1) ss << ",";
     }
     ss << "],";
-    ss << "\"fea_label\":[";     
+    ss << "\"fea_labels_"<< type << "\":[";     
         ss << label; 
+
+    ss << "],";
+    ss << "\"client_id\":";     
+        ss << client_id ;
+
+    ss << "}";
+
+    std::string payload = ss.str();
+
+    int msg_id = esp_mqtt_client_publish(mqtt_client, MQTT_TOPIC_PUB, payload.c_str(), payload.length(), 1, 0);
+      
+    if (msg_id != -1) {
+        ESP_LOGI("MQTT", "Published feature vector, msg_id=%d", msg_id);
+    } else {
+        ESP_LOGE("MQTT", "Failed to publish feature vector");
+    }
+    return;
+}
+
+
+void publish_fisher_vector(int label ) {
+    std::stringstream ss;
+    //int label=1;
+    //int client_id=1;
+   uint32_t  client_id=get_client_id();
+    ss << "{\"fisher_theta\":[";
+
+    for (int i = 0; i < DENSE_IN_FEATURES; ++i) {
+        ss << f_out[i];
+        if (i != DENSE_IN_FEATURES - 1) ss << ",";
+    }
+    ss << "],";
+    ss << "\"fisher_matrix\":[";     
+     for (int i = 0; i < DENSE_IN_FEATURES; ++i) {
+        ss << f_out[i];
+        if (i != DENSE_IN_FEATURES - 1) ss << ",";
+    } 
 
     ss << "],";
     ss << "\"client_id\":";     
@@ -204,9 +242,6 @@ void handle_classifier_weight(const float *values, size_t len, const int32_t *sh
 #if 1
  #include "model_pb_handler.h"
 
-void update_classifier_weights(const float* values, int value_count);
-void update_classifier_bais(const float* values, int value_count);
-
 
 
 static esp_err_t mqtt_event_handler_cb (esp_mqtt_event_handle_t event) {
@@ -215,7 +250,7 @@ static esp_err_t mqtt_event_handler_cb (esp_mqtt_event_handle_t event) {
             ESP_LOGI(TAG, "MQTT connected");
             //test_protobuf();
             esp_mqtt_client_subscribe(event->client, MQTT_TOPIC_SUB, 1);
-            publish_feature_vector(1);
+            //publish_feature_vector(1);
             break;
         case MQTT_EVENT_DATA:{
             
@@ -224,39 +259,27 @@ static esp_err_t mqtt_event_handler_cb (esp_mqtt_event_handle_t event) {
             ParsedModelParams params;
             //ModelParams *msg = (ModelParams*)strndup(event->data, event->data_len);
             if(decode_model_params( (uint8_t *)event->data, event->data_len, &params)) {
-
-            //if (decode_model_params((uint8_t *)event->data, event->data_len, &params)) {
-                //printf("Received ParamType: %d\n", params.param_type);
-                //printf("Client ID: %d\n", params.client_id);
-                //printf("Values count: %d\n", params.value_count);
-
-                // 示例：若为分类头权重
-                // if (params.param_type == ParamType_CLASSIFIER_WEIGHT) {
-                //     // 将 params.values 写入本地模型推理结构
-                //    update_classifier_weights(params.values, params.value_count);
-                // }
-
-
+  
             // 处理参数类型
             switch (params.param_type) {
                 case ParamType_CLASSIFIER_WEIGHT:
                     ESP_LOGI(TAG, "Classifier weight received, values: %d", params.value_count);
                     //handle_classifier_weight(params.values, params.values_count, params.shape, params.shape_count);
-                    update_classifier_weights(params.values, params.value_count);
+                    update_classifier_weights_bias(params.values, params.value_count,0);
                     break;
                 case ParamType_CLASSIFIER_BIAS:
                     ESP_LOGI(TAG, "Classifier bias received");
                     //handle_classifier_bias(params.values, params.value_count);
-                    update_classifier_bias(params.values, params.value_count);
+                    update_classifier_weights_bias(params.values, params.value_count,1);
 
                     break;
                 case ParamType_ENCODER_WEIGHT:
-                    ESP_LOGI(TAG, "Encoder weight received");
-                    update_classifier_weights(params.values, params.value_count);
+                    ESP_LOGI(TAG, "Fisher weight received");
+                    update_fishermatrix_theta(params.values, params.value_count,0);
                     break;
                 case ParamType_ENCODER_BIAS:
-                    ESP_LOGI(TAG, "Encoder bias received");
-                    update_classifier_bias(params.values, params.value_count);
+                    ESP_LOGI(TAG, "Fisher bias received");
+                    update_fishermatrix_theta(params.values, params.value_count,1);
                     break;
                 default:
                     ESP_LOGW(TAG, "Unknown or unsupported param_type: %d", params.param_type);
