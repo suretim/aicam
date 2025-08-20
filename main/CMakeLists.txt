@@ -15,8 +15,9 @@ if(0)
             ${PROTO_SRCS} 
             
             "config_web.cpp" 
-            "config_wifi.cc" 
-                       
+            "config_wifi.cc"
+            "config_mqtt.cc" 
+            "classifier.cc"            
             
             #"cin_web.cc"
             #"video_stream_optimized.cc"
@@ -26,8 +27,8 @@ if(0)
 
             "img_inference.cc" 
             "config_camera.cc" 
-            "config_mqtt.cpp" 
-            "classifier.cc" 
+            
+            
             
         EMBED_FILES 
             "web_content/index_http.html" 
@@ -42,7 +43,6 @@ if(0)
             nanopb 
             nvs_flash 
             esp_psram 
-            esp_http_server 
             console 
             esp_netif 
             esp_http_server 
@@ -59,10 +59,13 @@ else()
     set(TFLITE_META_SRCS "${TFLITE_SRC_DIR}/meta_lstm_classifier.tflite"   )
     idf_component_register(
         SRCS 
-            "main_lll.cpp"   
-            "config_mqtt.cpp"    
+            "main_lll.cpp" 
+            ${PROTO_SRCS}
+            "model_pb_handler.cc"   
+            "config_mqtt.cc"
+            "config_wifi.cc"
+            "classifier.cc"    
             "classifier_storage.cc"  
-            "classifier.cc"   
             "infer_esp32_lstm_lll.cc"
 
         PRIV_INCLUDE_DIRS "." ${PROTO_PB_DIR} ${PROTO_SRC_DIR}     
@@ -73,16 +76,15 @@ else()
             nvs_flash
             esp_psram
             esp_wifi
+            esp_netif
             mqtt
             nanopb
-            #"spiffs"
             console
-            json
-            #"fed_server/vit/student_fp32.tflite"
-            #"fed_server/lstm/lstm_encoder_contrastive.tflite"
-            #"../fed_server/lstm/meta_lstm_classifier.tflite"
+            json 
         )
 endif()
+
+#"spiffs"
 #$env:IDF_COMPONENT_MANAGER="enabled"
 #https://components.espressif.com/api/
 #git clone https://github.com/nanopb/nanopb.git

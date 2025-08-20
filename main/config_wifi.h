@@ -1,6 +1,6 @@
 #pragma once
 
-//#include "esp_event.h"
+#include "esp_event.h"
 void wifi_init(void) ;
 void wifi_init_apsta(void);
 void wait_for_wifi_connection() ;

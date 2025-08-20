@@ -1,13 +1,16 @@
 #include "classifier.h" 
-
+#include "config_mqtt.h"
 #include "esp_log.h" 
-#include <string>
-#include <sstream>
+//#include <string>
+//#include <sstream>
 #include <stdlib.h> 
 #include <math.h>
-  
 
 #include <string.h>
+#include <stdio.h>  
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"  
 
 
 // 全局变量保存权重和偏置（可以从 protobuf 接收到的参数更新）
@@ -24,10 +27,10 @@ constexpr int FisherArenaSize = FISHER_LAYER * 256 *sizeof(float); // 调整大�
 void alloc_fisher_matrix()
 {
     if (fisher_matrix == NULL) {
-        fisher_matrix = (uint8_t*) heap_caps_malloc(FisherArenaSize, MALLOC_CAP_SPIRAM);
+        fisher_matrix = (float*) heap_caps_malloc(FisherArenaSize, MALLOC_CAP_SPIRAM);
     }
     if (theta == NULL) {
-        theta = (uint8_t*) heap_caps_malloc(FisherArenaSize, MALLOC_CAP_SPIRAM);
+        theta = (float*) heap_caps_malloc(FisherArenaSize, MALLOC_CAP_SPIRAM);
     }
 }
 
@@ -56,7 +59,8 @@ static float softmax(float x[], int len, int *out_index) {
     if (out_index) *out_index = max_idx;
     return max_prob;
 }
-void publish_feature_vector(int label ,int type);
+
+
 int classifier_predict(const float *features) {
     float logits[CLASSIFIER_OUTPUT_DIM] = {0};
     for (int i = 0; i < CLASSIFIER_OUTPUT_DIM; ++i) {
@@ -105,23 +109,15 @@ void update_classifier_weights_bias(const float* values, int value_count,int typ
 
 }
 void update_fishermatrix_theta(const float* values, int value_count,int type) {
-    int expected = sizeof(fisher_matrix)/sizeof(float);
-    
+     
+     
     if(type==0)
     {
-        expected=sizeof(theta)/sizeof(float);
-    }
-    if (value_count != expected) {
-        printf("权重参数数量不匹配，期望 %d，实际 %d\n", expected, value_count);
-        return;
-    }
-    if(type==0)
-    {
-        memcpy(fisher_matrix, values, sizeof(fisher_matrix));
+        memcpy(fisher_matrix, values, value_count);
         return;
     }
     else{
-        memcpy(theta, values, sizeof(theta));
+        memcpy(theta, values,value_count);
         return;    
     }
      

@@ -249,7 +249,7 @@ void initialize_nvs_robust() {
 }
  
 // 全局异常保护
-void safe_nvs_operation() {
+void safe_nvs_operation(void) {
     // 设置看门狗
     //    init_classifier_from_header();
 

@@ -13,6 +13,7 @@
 #include "tensorflow/lite/schema/schema_generated.h" 
 #include "classifier_storage.h"
 #include "classifier.h"
+#include "config_mqtt.h"
 // -------------------------
 // 模型数据 (TFLite flatbuffer) lstm_encoder_contrastive 和 meta_lstm_classifier
 // -------------------------
@@ -180,7 +181,7 @@ void update_interpreter_weights(void) {
     TfLiteTensor* tensor = reinterpret_cast<TfLiteTensor*>(eval_tensor);
     float* tensor_data = tensor->data.f;  // Access the tensor data (float32 values)
  
-    // 5️⃣ 计算梯度 & EWC 微调
+    // 计算梯度 & EWC 微调
     float* grad = new float[theta_len];
 
     //srandom(esp_timer_get_time());  // Use system time as the seed
@@ -199,7 +200,7 @@ void update_interpreter_weights(void) {
            // 更新权重： w = w - lr*grad + lambda*F*(w - w_prev)
            float delta = LR * grad[i] + 
                LAMBDA_EWC * fisher_matrix[i * fisher_vi_len + j] * 
-               (tensor_data[i * fisher_vi_len + j] - theta_old[i * fisher_vi_len + j]);
+               (tensor_data[i * fisher_vi_len + j] - theta[i * fisher_vi_len + j]);
            tensor_data[i * fisher_vi_len + j] -= delta;
        }
    } 
@@ -262,10 +263,10 @@ TfLiteStatus loop() {
     // printf("\n");
 
     
-    // get_mqtt_feature(output->data.f); 
-    //int predicted = classifier_predict(output->data.f);
-    //printf("Predicted class: %d\n", predicted); 
-  //vTaskDelay(1); // to avoid watchdog trigger
+     get_mqtt_feature(output->data.f); 
+     int predicted = classifier_predict(output->data.f);
+     printf("Predicted class: %d\n", predicted); 
+     vTaskDelay(1); // to avoid watchdog trigger
   return kTfLiteOk;
 } 
  
@@ -293,7 +294,7 @@ TfLiteStatus run_inference(float* input_seq, int seq_len, int num_feats, float* 
       return kTfLiteError;
     }
  
-    tflite::MicroMutableOpResolver<20> micro_op_resolver;
+    tflite::MicroMutableOpResolver<21> micro_op_resolver;
     micro_op_resolver.AddStridedSlice();
     micro_op_resolver.AddPack();
     micro_op_resolver.AddConv2D();
@@ -305,7 +306,8 @@ TfLiteStatus run_inference(float* input_seq, int seq_len, int num_feats, float* 
     micro_op_resolver.AddDequantize();
     micro_op_resolver.AddSoftmax();
 
-    micro_op_resolver.AddAdd();
+    micro_op_resolver.AddAdd(); 
+    micro_op_resolver.AddSub();
     micro_op_resolver.AddMul();
     micro_op_resolver.AddShape();
     micro_op_resolver.AddTranspose();
@@ -313,7 +315,9 @@ TfLiteStatus run_inference(float* input_seq, int seq_len, int num_feats, float* 
     micro_op_resolver.AddFill();
     micro_op_resolver.AddSplit(); 
     micro_op_resolver.AddLogistic();  // This handles sigmoid activation
-micro_op_resolver.AddTanh();
+    micro_op_resolver.AddTanh();
+
+    micro_op_resolver.AddMean();
 
   static tflite::MicroInterpreter static_interpreter(
       model, micro_op_resolver, tensor_arena, kTensorArenaSize);

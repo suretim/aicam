@@ -220,7 +220,7 @@ return kTfLiteOk;
 
 
 //u_int8_t get_tensor_state(void);
-void tensor_run(void) 
+void imag_tensor_run(void) 
 {
  
      while (true)
