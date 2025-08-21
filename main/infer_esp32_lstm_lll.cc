@@ -55,7 +55,7 @@ bool received_flag = false;
 // 層資訊（依 Python 端 trainable_variables）
 std::vector<std::vector<float>> trainable_layers;
 std::vector<std::vector<float>> fisher_layers;
-std::vector<std::vector<int>> layer_shapes;
+extern std::vector<std::vector<int>> layer_shapes;
 
   
 
@@ -431,10 +431,10 @@ TfLiteStatus run_inference(float* input_seq, int seq_len, int num_feats, float* 
     //memcpy(out_logits, output->data.f, num_classes * sizeof(float));
  
   if (kTfLiteOk != loop()) {
-    MicroPrintf("Image loop failed.");
+    MicroPrintf(" inference loop failed.");
     return kTfLiteError;
   } 
-      interpreter->ResetTempAllocations();
+   //   interpreter->ResetTempAllocations();
 
     //free(tensor_arena);
    // ESP_LOGI(TAG, "推理完成，系统正常运行");
@@ -476,7 +476,7 @@ void lll_tensor_run(void)
               break; 
             }
           
-      vTaskDelay(pdMS_TO_TICKS(10000));  // 每10秒输出一次
+      vTaskDelay(pdMS_TO_TICKS(60000));  // 每10秒输出一次
       //  vTaskDelay(30000 / portTICK_PERIOD_MS);
     }  
     reset_tensor();

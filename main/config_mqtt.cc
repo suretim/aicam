@@ -29,7 +29,7 @@
 #define MQTT_TOPIC_PUB "grpc_sub/weights"
 
 #define MQTT_TOPIC_SUB "federated_model/parameters"
-#define FISH_TOPIC_SUB "ewc/weight_fisher"
+#define WEIGHT_FISH_SUB "ewc/weight_fisher"
 #define FISH_SHAP_SUB  "ewc/layer_shapes"
 
 #define MQTT_KEEPALIVE_SECONDS 120
@@ -118,7 +118,7 @@ void publish_feature_vector(int label,int type ) {
     int msg_id = esp_mqtt_client_publish(mqtt_client, MQTT_TOPIC_PUB, payload.c_str(), payload.length(), 1, 0);
       
     if (msg_id != -1) {
-        ESP_LOGI("MQTT", "Published feature vector, msg_id=%d", msg_id);
+        ESP_LOGI("MQTT", "%s, msg_id=%d",payload.c_str(), msg_id);
     } else {
         ESP_LOGE("MQTT", "Failed to publish feature vector");
     }
@@ -236,6 +236,35 @@ void handle_classifier_weight(const float *values, size_t len, const int32_t *sh
 
 #if 1
  #include "model_pb_handler.h"
+ #include "cJSON.h"
+
+  std::vector<std::vector<int>> layer_shapes;
+ 
+  std::vector<std::vector<int>> parse_layer_shapes(const std::string& json_str) {
+    std::vector<std::vector<int>> shapes;
+
+    cJSON *root = cJSON_Parse(json_str.c_str());
+    if (!root) {
+        printf("Failed to parse JSON\n");
+        return shapes;   // ✅ 出錯時 return 空
+    }
+
+    int array_size = cJSON_GetArraySize(root);
+    for (int i = 0; i < array_size; i++) {
+        cJSON *layer = cJSON_GetArrayItem(root, i);
+        std::vector<int> shape;
+        int dim_size = cJSON_GetArraySize(layer);
+        for (int j = 0; j < dim_size; j++) {
+            cJSON *dim = cJSON_GetArrayItem(layer, j);
+            shape.push_back(dim->valueint);
+        }
+        shapes.push_back(shape);
+    }
+
+    cJSON_Delete(root);
+
+    return shapes;   
+}
 
 
 
@@ -246,8 +275,8 @@ static esp_err_t mqtt_event_handler_cb (esp_mqtt_event_handle_t event) {
             ESP_LOGI(TAG, "MQTT connected");
             //test_protobuf();
             esp_mqtt_client_subscribe(event->client, MQTT_TOPIC_SUB, 1);
-            esp_mqtt_client_subscribe(event->client, FISH_TOPIC_SUB, 1);
             esp_mqtt_client_subscribe(event->client, FISH_SHAP_SUB, 1);
+            esp_mqtt_client_subscribe(event->client, WEIGHT_FISH_SUB, 1);
             publish_feature_vector(0,1);
             //publish_feature_vector(1);
             break;
@@ -257,17 +286,9 @@ static esp_err_t mqtt_event_handler_cb (esp_mqtt_event_handle_t event) {
                 std::string json_str(event->data, event->data + event->data_len);
                 layer_shapes = parse_layer_shapes(json_str);
 
-                Serial.printf("Received %d layers\n", layer_shapes.size());
-                for (size_t i = 0; i < layer_shapes.size(); i++) {
-                    Serial.print("Layer ");
-                    Serial.print(i);
-                    Serial.print(": ");
-                    for (int d : layer_shapes[i]) Serial.print(d), Serial.print(" ");
-                    Serial.println();
-                }
             }
 
-            if(strcmp(event->topic,FISH_TOPIC_SUB)==0)
+            if(strcmp(event->topic,WEIGHT_FISH_SUB )==0)
             {
                 ESP_LOGI(TAG, "Received %d bytes on topic: %.*s", event->data_len, event->topic_len, event->topic);
                 ewc_buffer.insert(ewc_buffer.end(), event->data,event->data + event->data_len);
