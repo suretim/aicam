@@ -40,7 +40,7 @@ namespace {
   TfLiteTensor* output_tensor= nullptr; 
 
   constexpr int kTensorArenaSize = 1024 * 1024;  
-  static uint8_t *tensor_arena;//[kTensorArenaSize]; // Maybe we should move this to external
+  static uint8_t *tensor_arena= nullptr;//[kTensorArenaSize]; // Maybe we should move this to external
 }  // namespace
 
 //float *gradients ;       // 模拟梯度
@@ -182,6 +182,7 @@ void update_dense_layer_weights(
         TfLiteTensor* tensor = reinterpret_cast<TfLiteTensor*>(eval_tensor);
     size_t n = 1;
     for(int s : shape) n *= s;
+    printf("train weights nums: %d\n",n);
     for(size_t i=0; i<n; ++i) tensor->data.f[i] = weights[i];
 }
 
@@ -326,17 +327,17 @@ TfLiteStatus loop() {
 // The name of this function is important for Arduino compatibility.
 //TfLiteStatus setup(void) {
 TfLiteStatus run_inference(float* input_seq, int seq_len, int num_feats, float* out_logits) {
-    extern size_t theta_len;  
-    extern size_t fisher_len; 
+    //extern size_t theta_len;  
+    //extern size_t fisher_len; 
     // Map the model into a usable data structure. This doesn't involve any
     // copying or parsing, it's a very lightweight operation.
     
-    if(fisher_len <=0 || theta_len <= 0)
-    {
-      ESP_LOGE(TAG, "Failed get fisher matrix (normal if first loaded)");
+    //if(fisher_len <=0 || theta_len <= 0)
+    //{
+    //  ESP_LOGE(TAG, "Failed get fisher matrix (normal if first loaded)");
       //if( safe_nvs_operation() ==0)
       //    return kTfLiteError;
-    }
+    //}
     //encoder_model_float=asm("_binary_encoder_model_float_tflite_start"); 
     model = tflite::GetModel(meta_lstm_classifier_tflite);
     if (model->version() != TFLITE_SCHEMA_VERSION) {
@@ -395,30 +396,14 @@ TfLiteStatus run_inference(float* input_seq, int seq_len, int num_feats, float* 
           ESP_LOGE(TAG, "获取输入输出张量失败");
           return kTfLiteError;
       }
-    // int image_width = input->dims->data[1];
-    //int image_height = input->dims->data[2];
-    //int channels = input->dims->data[3];
-  
-
-// 微调示意：更新权重，EWC参与
-   #if 1
-
-
-// 更新 Dense 層權重
+     
+    // 微调示意：更新权重，EWC参与 
+    // 更新 Dense 層權重
     for(size_t i=0; i<trainable_layers.size(); ++i) {
         update_dense_layer_weights( i, trainable_layers[i], layer_shapes[i]);
     }
 
-    
-
-   #else
-    int fisher_weight_len= update_interpreter_weights(FISHER_LAYER);
-    if(fisher_weight_len <= 0)
-    {
-      return kTfLiteError;
-    }
-
-    #endif
+     
     printf("input dims: %d %d %d %d  output dims: %d %d  \n",
         input_tensor->dims->data[0],
         input_tensor->dims->data[1],
@@ -428,8 +413,7 @@ TfLiteStatus run_inference(float* input_seq, int seq_len, int num_feats, float* 
         output_tensor->dims->data[1] 
          );
        
-        update_interpreter_weights(FISHER_LAYER);
-    
+        
    for (int t=0; t<SEQ_LEN; t++)
         for (int f=0; f<FEATURE_DIM; f++)
             input_tensor->data.f[t*FEATURE_DIM + f] = input_seq[t*FEATURE_DIM+f];
@@ -450,7 +434,9 @@ TfLiteStatus run_inference(float* input_seq, int seq_len, int num_feats, float* 
     MicroPrintf("Image loop failed.");
     return kTfLiteError;
   } 
- 
+      interpreter->ResetTempAllocations();
+
+    //free(tensor_arena);
    // ESP_LOGI(TAG, "推理完成，系统正常运行");
  
 return kTfLiteOk;

@@ -16,7 +16,7 @@
 //#define NUM_CLASSES 2
 //#define EMBEDDING_DIM 64
 #define TAG "MQTT"
-#if 0
+#if 1
     //#define MQTT_BROKER_URI "mqtt://192.168.133.129:1883"
     #define MQTT_BROKER_URI "mqtt://192.168.68.237:1883"
 #else
@@ -27,10 +27,11 @@
 #define MQTT_PASSWORD "tim"
 #define MQTT_CLIENT_ID_PREFIX "mqttx_" 
 #define MQTT_TOPIC_PUB "grpc_sub/weights"
-//GRPC_SUBSCRIBE = "grpc_sub/weights"
 
 #define MQTT_TOPIC_SUB "federated_model/parameters"
-#define FISH_TOPIC_SUB "fisher_model/parameters"
+#define FISH_TOPIC_SUB "ewc/weight_fisher"
+#define FISH_SHAP_SUB  "ewc/layer_shapes"
+
 #define MQTT_KEEPALIVE_SECONDS 120
  
  
@@ -81,60 +82,37 @@ void publish_feature_vector(int label,int type ) {
     std::stringstream ss;
     //int label=1;
     //int client_id=1;
-   uint32_t  client_id=get_client_id();
-    ss << "{\"fea_weights\":[";
+    if(type==1)
+    {
+       ss << "{\"request\":[";     
+            ss << type; 
 
-    for (int i = 0; i < DENSE_IN_FEATURES; ++i) {
-        ss << f_out[i];
-        if (i != DENSE_IN_FEATURES - 1) ss << ",";
+        ss << "]}"; 
     }
-    ss << "],";
-    ss << "\"fea_labels_"<< type << "\":[";     
-        ss << label; 
+    else{
+        uint32_t  client_id=get_client_id();
+        ss << "{\"fea_weights\":[";
+        for (int i = 0; i < DENSE_IN_FEATURES; ++i) {
+            ss << f_out[i];
+            if (i != DENSE_IN_FEATURES - 1) ss << ",";
+        }
+        ss << "],";
 
-    ss << "],";
-    ss << "\"client_id\":";     
-        ss << client_id ;
+        ss << "\"fea_labels\":[";     
+            ss << label; 
 
-    ss << "}";
+        ss << "],";
 
-    std::string payload = ss.str();
+        ss << "\"request\":[";     
+            ss << type; 
 
-    int msg_id = esp_mqtt_client_publish(mqtt_client, MQTT_TOPIC_PUB, payload.c_str(), payload.length(), 1, 0);
-      
-    if (msg_id != -1) {
-        ESP_LOGI("MQTT", "Published feature vector, msg_id=%d", msg_id);
-    } else {
-        ESP_LOGE("MQTT", "Failed to publish feature vector");
+        ss << "],";
+        
+        ss << "\"client_id\":";     
+            ss << client_id ;
+
+        ss << "}";
     }
-    return;
-}
-
-
-void publish_fisher_vector(int label ) {
-    std::stringstream ss;
-    //int label=1;
-    //int client_id=1;
-   uint32_t  client_id=get_client_id();
-    ss << "{\"fisher_theta\":[";
-
-    for (int i = 0; i < DENSE_IN_FEATURES; ++i) {
-        ss << f_out[i];
-        if (i != DENSE_IN_FEATURES - 1) ss << ",";
-    }
-    ss << "],";
-    ss << "\"fisher_matrix\":[";     
-     for (int i = 0; i < DENSE_IN_FEATURES; ++i) {
-        ss << f_out[i];
-        if (i != DENSE_IN_FEATURES - 1) ss << ",";
-    } 
-
-    ss << "],";
-    ss << "\"client_id\":";     
-        ss << client_id ;
-
-    ss << "}";
-
     std::string payload = ss.str();
 
     int msg_id = esp_mqtt_client_publish(mqtt_client, MQTT_TOPIC_PUB, payload.c_str(), payload.length(), 1, 0);
@@ -262,19 +240,39 @@ void handle_classifier_weight(const float *values, size_t len, const int32_t *sh
 
 
 static esp_err_t mqtt_event_handler_cb (esp_mqtt_event_handle_t event) {
-    size_t type=3;
-    switch (event->event_id) {
-         
-        
+    
+    switch (event->event_id) {        
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG, "MQTT connected");
             //test_protobuf();
             esp_mqtt_client_subscribe(event->client, MQTT_TOPIC_SUB, 1);
             esp_mqtt_client_subscribe(event->client, FISH_TOPIC_SUB, 1);
+            esp_mqtt_client_subscribe(event->client, FISH_SHAP_SUB, 1);
+            publish_feature_vector(0,1);
             //publish_feature_vector(1);
             break;
         case MQTT_EVENT_DATA:{
             
+            if (strcmp(event->topic, FISH_SHAP_SUB) == 0) {
+                std::string json_str(event->data, event->data + event->data_len);
+                layer_shapes = parse_layer_shapes(json_str);
+
+                Serial.printf("Received %d layers\n", layer_shapes.size());
+                for (size_t i = 0; i < layer_shapes.size(); i++) {
+                    Serial.print("Layer ");
+                    Serial.print(i);
+                    Serial.print(": ");
+                    for (int d : layer_shapes[i]) Serial.print(d), Serial.print(" ");
+                    Serial.println();
+                }
+            }
+
+            if(strcmp(event->topic,FISH_TOPIC_SUB)==0)
+            {
+                ESP_LOGI(TAG, "Received %d bytes on topic: %.*s", event->data_len, event->topic_len, event->topic);
+                ewc_buffer.insert(ewc_buffer.end(), event->data,event->data + event->data_len);
+                break;
+            }
             //printf("MQTT payload received: topic=%.*s\n", event->topic_len, event->topic);
             //printf("MQTT payload received %d : topic=%s\n", event->topic_len, event->topic);
             ParsedModelParams params;
@@ -291,32 +289,22 @@ static esp_err_t mqtt_event_handler_cb (esp_mqtt_event_handle_t event) {
                         ESP_LOGI(TAG, "Classifier bias received");
                         //handle_classifier_bias(params.values, params.value_count);
                         update_classifier_weights_bias(params.values, params.value_count,1);
-                        type=0;  
+                        //type=0;  
                         break;
-                    case ParamType_ENCODER_WEIGHT:
-                        if(strstr(event->topic,"fisher"))
-                        {
-                            ESP_LOGI(TAG, "Received %d bytes on topic: %.*s", event->data_len, event->topic_len, event->topic);
-                            ewc_buffer.insert(ewc_buffer.end(), params.values, params.values + params.value_count);
-                        }
-                        else
-                        {  
+                    case ParamType_ENCODER_WEIGHT:  
                             ESP_LOGI(TAG, "Fisher weight received");
                             update_fishermatrix_theta(params.values, params.value_count,0);
-                        }
+                         
                         break;
                     case ParamType_ENCODER_BIAS:
                         ESP_LOGI(TAG, "Fisher bias received");
                         update_fishermatrix_theta(params.values, params.value_count,1);                        
-                        type=1;
+                        //type=1;
                         break;
                     default:
                         ESP_LOGW(TAG, "Unknown or unsupported param_type: %d", params.param_type);
                         break;
                 } 
-                
-                //if(type==0||type==1 )
-                //    mqtt_on_message((uint8_t*)params.values, params.value_count,type);  //set to nvs 1 means fisher update
             }
             else{
                 //printf("MQTT decode error data_len=%d : data=%s\n", event->data_len, event->data);
@@ -431,12 +419,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
     
     return;
 }
-
-// ---------------- MQTT 发布推理结果 ----------------
-// void mqtt_send_result(esp_mqtt_client_handle_t client, const char *payload) {
-//     int msg_id = esp_mqtt_client_publish(client, MQTT_TOPIC_PUB, payload, 0, 1, 0);
-//     ESP_LOGI("MQTT", "Published to %s: %s (msg_id=%d)", MQTT_TOPIC_PUB, payload, msg_id);
-// }
 
   
 // ---------------- 启动 MQTT 客户端 ----------------
