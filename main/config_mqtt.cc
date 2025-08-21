@@ -2,11 +2,14 @@
 #include "esp_log.h" 
 #include <string>
 #include <sstream>
+#include <vector>
+#include <fstream>
 #include <stdlib.h> 
 #include "classifier.h"
 #include "cJSON.h"
 #include "esp_wifi.h"   
 #include <mbedtls/sha1.h>
+#include "classifier_storage.h"
 //#define INFINITY 1000 
 #define DENSE_IN_FEATURES 64
 #define DENSE_OUT_CLASSES 3
@@ -17,8 +20,8 @@
     //#define MQTT_BROKER_URI "mqtt://192.168.133.129:1883"
     #define MQTT_BROKER_URI "mqtt://192.168.68.237:1883"
 #else
-    //#define MQTT_BROKER_URI "mqtt://192.168.0.57:1883"
-    #define MQTT_BROKER_URI "mqtt://127.0.0.1:1883"
+     #define MQTT_BROKER_URI "mqtt://192.168.0.57:1883"
+     
 #endif
 #define MQTT_USERNAME "tim"
 #define MQTT_PASSWORD "tim"
@@ -27,7 +30,21 @@
 //GRPC_SUBSCRIBE = "grpc_sub/weights"
 
 #define MQTT_TOPIC_SUB "federated_model/parameters"
+#define FISH_TOPIC_SUB "fisher_model/parameters"
 #define MQTT_KEEPALIVE_SECONDS 120
+ 
+ 
+
+std::vector<uint8_t> ewc_buffer;  // 接收 buffer
+
+// 在 buffer 收到完整檔案後，可寫入 SPIFFS 或直接解析
+// bool save_ewc_to_file(const char* path) {
+//     FILE* f = fopen(path, "wb");
+//     if (!f) return false;
+//     fwrite(ewc_buffer.data(), 1, ewc_buffer.size(), f);
+//     fclose(f);
+//     return true;
+// }
 
 
 static esp_mqtt_client_handle_t mqtt_client = NULL; 
@@ -130,7 +147,7 @@ void publish_fisher_vector(int label ) {
     return;
 }
 
-
+ 
 #if 0
 int test_protobuf() {
     // 模拟收到 protobuf 编码的数据（你实际中来自 MQTT）
@@ -245,11 +262,15 @@ void handle_classifier_weight(const float *values, size_t len, const int32_t *sh
 
 
 static esp_err_t mqtt_event_handler_cb (esp_mqtt_event_handle_t event) {
+    size_t type=3;
     switch (event->event_id) {
+         
+        
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG, "MQTT connected");
             //test_protobuf();
             esp_mqtt_client_subscribe(event->client, MQTT_TOPIC_SUB, 1);
+            esp_mqtt_client_subscribe(event->client, FISH_TOPIC_SUB, 1);
             //publish_feature_vector(1);
             break;
         case MQTT_EVENT_DATA:{
@@ -258,37 +279,44 @@ static esp_err_t mqtt_event_handler_cb (esp_mqtt_event_handle_t event) {
             //printf("MQTT payload received %d : topic=%s\n", event->topic_len, event->topic);
             ParsedModelParams params;
             //ModelParams *msg = (ModelParams*)strndup(event->data, event->data_len);
-            if(decode_model_params( (uint8_t *)event->data, event->data_len, &params)) {
-  
-            // 处理参数类型
-            switch (params.param_type) {
-                case ParamType_CLASSIFIER_WEIGHT:
-                    ESP_LOGI(TAG, "Classifier weight received, values: %d", params.value_count);
-                    //handle_classifier_weight(params.values, params.values_count, params.shape, params.shape_count);
-                    update_classifier_weights_bias(params.values, params.value_count,0);
-                    break;
-                case ParamType_CLASSIFIER_BIAS:
-                    ESP_LOGI(TAG, "Classifier bias received");
-                    //handle_classifier_bias(params.values, params.value_count);
-                    update_classifier_weights_bias(params.values, params.value_count,1);
-
-                    break;
-                case ParamType_ENCODER_WEIGHT:
-                    ESP_LOGI(TAG, "Fisher weight received");
-                    update_fishermatrix_theta(params.values, params.value_count,0);
-                    break;
-                case ParamType_ENCODER_BIAS:
-                    ESP_LOGI(TAG, "Fisher bias received");
-                    update_fishermatrix_theta(params.values, params.value_count,1);
-                    break;
-                default:
-                    ESP_LOGW(TAG, "Unknown or unsupported param_type: %d", params.param_type);
-                    break;
-            }
-
-
-
-
+            if(decode_model_params( (uint8_t *)event->data, event->data_len, &params)) { 
+                // 处理参数类型
+                switch (params.param_type) {
+                    case ParamType_CLASSIFIER_WEIGHT:
+                        ESP_LOGI(TAG, "Classifier weight received, values: %d", params.value_count);
+                        //handle_classifier_weight(params.values, params.values_count, params.shape, params.shape_count);
+                        update_classifier_weights_bias(params.values, params.value_count,0);
+                        break;
+                    case ParamType_CLASSIFIER_BIAS:
+                        ESP_LOGI(TAG, "Classifier bias received");
+                        //handle_classifier_bias(params.values, params.value_count);
+                        update_classifier_weights_bias(params.values, params.value_count,1);
+                        type=0;  
+                        break;
+                    case ParamType_ENCODER_WEIGHT:
+                        if(strstr(event->topic,"fisher"))
+                        {
+                            ESP_LOGI(TAG, "Received %d bytes on topic: %.*s", event->data_len, event->topic_len, event->topic);
+                            ewc_buffer.insert(ewc_buffer.end(), params.values, params.values + params.value_count);
+                        }
+                        else
+                        {  
+                            ESP_LOGI(TAG, "Fisher weight received");
+                            update_fishermatrix_theta(params.values, params.value_count,0);
+                        }
+                        break;
+                    case ParamType_ENCODER_BIAS:
+                        ESP_LOGI(TAG, "Fisher bias received");
+                        update_fishermatrix_theta(params.values, params.value_count,1);                        
+                        type=1;
+                        break;
+                    default:
+                        ESP_LOGW(TAG, "Unknown or unsupported param_type: %d", params.param_type);
+                        break;
+                } 
+                
+                //if(type==0||type==1 )
+                //    mqtt_on_message((uint8_t*)params.values, params.value_count,type);  //set to nvs 1 means fisher update
             }
             else{
                 //printf("MQTT decode error data_len=%d : data=%s\n", event->data_len, event->data);
@@ -400,6 +428,7 @@ static esp_err_t mqtt_event_handler_cb(esp_mqtt_event_handle_t event) {
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
                                int32_t event_id, void *event_data) {
     mqtt_event_handler_cb((esp_mqtt_event_handle_t)event_data);
+    
     return;
 }
 
@@ -447,3 +476,6 @@ void start_mqtt_client (void) {
     ESP_ERROR_CHECK(esp_mqtt_client_start(mqtt_client)); 
     return;
 }
+
+
+ 

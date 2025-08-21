@@ -1,19 +1,20 @@
 import os
+import argparse
 import platform
 import subprocess
 import time
 import requests
 import zipfile
 import tarfile
-
-
+INSTALL_DIR="c:\\emqt\\"
+VERSION="5.0.26"
 class EMQXServer:
-    def __init__(self, version="5.0.26"):
+    def __init__(self, version=None,install_dir=None):
         self.version = version
+        self.install_dir=install_dir   #"c:\\emqt\\"
         self.system = platform.system().lower()
         self.arch = "amd64" if platform.machine().endswith('64') else "386"
         #self.install_dir = os.path.join(os.getcwd(), f"emqx-{self.version}")
-        self.install_dir="c:\\emqt\\"
         self.install_dir = os.path.join(self.install_dir, f"emqx-{self.version}-windows-amd64\\")
         self.bin_path0 = os.path.join(self.install_dir, "bin", "emqx")
         self.conf_path = os.path.join(self.install_dir, "etc", "emqx.conf")
@@ -80,13 +81,13 @@ class EMQXServer:
             return False
 
 
-if __name__ == "__main__":
-    emqx = EMQXServer(version="5.0.26")  # 可修改版本号
-
-    #if not os.path.exists(emqx.install_dir):
-    #    emqx.download_emqx()
-
+def main(args):
+    # 更新全局变量
+    global  INSTALL_DIR , VERSION 
+    INSTALL_DIR = args.install_dir 
+    VERSION = args.version 
     try:
+        emqx = EMQXServer(version=args.version,install_dir=args.install_dir)  # 可修改版本号
         emqx.start_server()
         time.sleep(4)
         if emqx.check_status():
@@ -101,3 +102,17 @@ if __name__ == "__main__":
             time.sleep(1)
     except KeyboardInterrupt:
         emqx.stop_server()
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser() 
+    parser.add_argument("--install_dir", type=str, default=INSTALL_DIR) 
+    parser.add_argument("--version", type=str, default=VERSION) 
+    args = parser.parse_args()
+     
+    
+    main(args)
+    #if not os.path.exists(emqx.install_dir):
+    #    emqx.download_emqx()
+
+    

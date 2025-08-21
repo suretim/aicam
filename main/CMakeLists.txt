@@ -62,9 +62,8 @@ else()
             "main_lll.cpp" 
             ${PROTO_SRCS}
             "model_pb_handler.cc"   
-            "config_mqtt.cc"
-            "config_wifi.cc"
-            "classifier.cc"    
+            "config_mqtt.cc" 
+            "config_wifi.cc"   
             "classifier_storage.cc"  
             "infer_esp32_lstm_lll.cc"
 

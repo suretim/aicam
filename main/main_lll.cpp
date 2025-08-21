@@ -10,7 +10,7 @@
 #include <sstream>
 #include "esp_log.h"
 #include <esp_task_wdt.h>
-//#include "classifier_storage.h"
+#include "classifier_storage.h"
 
 
 static const char *TAG = "MAIN_LLL";
@@ -45,19 +45,10 @@ static const char *TAG = "MAIN_LLL";
  
   // Example MQTT callback (pseudo): receives classifier_weights.bin as payload
 // In real code wire up esp-mqtt and call this when message arrives
-// void mqtt_on_message(const uint8_t* payload, size_t payload_len) {
-//     // payload should be raw float32 bytes as produced by export script
-//     int rc = update_classifier_from_bin(payload, payload_len);
-//     if (rc == 0) {
-//         printf("MQTT classifier update applied.\n");
-//     } else {
-//         printf("MQTT classifier update failed.\n");
-//     }
-// }
+
 
 extern void start_mqtt_client(void);  
-extern void lll_tensor_run(void );
-extern void safe_nvs_operation(void);
+extern void lll_tensor_run(void );  
 // Example main demonstrating flow
 extern "C" void app_main(void) {
  
@@ -69,11 +60,11 @@ extern "C" void app_main(void) {
 //         ret = nvs_flash_init();
 //     }
 //     ESP_ERROR_CHECK(ret);
-  
-    // init_tflite_model();
+    init_classifier_from_header();
+
+    initialize_nvs_robust();
     wifi_init_apsta();   
     start_mqtt_client(); 
-    safe_nvs_operation() ;
     // 初始化 SPIFFS
     
     // init tflite

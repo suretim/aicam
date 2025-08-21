@@ -14,14 +14,14 @@
 
 
 // 全局变量保存权重和偏置（可以从 protobuf 接收到的参数更新）
-float g_dense_weights[CLASSIFIER_OUTPUT_DIM][CLASSIFIER_INPUT_DIM];
-float g_dense_bias[CLASSIFIER_OUTPUT_DIM];
+//float g_dense_weights[CLASSIFIER_OUTPUT_DIM][CLASSIFIER_INPUT_DIM];
+//float g_dense_bias[CLASSIFIER_OUTPUT_DIM];
 
 //float fisher_matrix[FISHER_LAYER*CLASSIFIER_INPUT_DIM];
 //float theta[FISHER_LAYER*CLASSIFIER_INPUT_DIM];
  
- float *fisher_matrix ;   // 每个变量的 Fisher 数组
- float *theta ;    // 上一次权重
+ //float *fisher_matrix ;   // 每个变量的 Fisher 数组
+ //float *theta ;    // 上一次权重
 //float *theta_old ;    // 上一次权重
 constexpr int FisherArenaSize = FISHER_LAYER * 256 *sizeof(float); // 调整大小
 void alloc_fisher_matrix()
