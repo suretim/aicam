@@ -46,8 +46,13 @@ static const char *TAG = "MAIN_LLL";
   // Example MQTT callback (pseudo): receives classifier_weights.bin as payload
 // In real code wire up esp-mqtt and call this when message arrives
 
-
-extern void start_mqtt_client(void);  
+void periodic_task(void *pvParameter) {
+    while (1) {
+        publish_feature_vector(0,1);
+        vTaskDelay(pdMS_TO_TICKS(10000)); // 延遲 60 秒
+    }
+}
+//extern void start_mqtt_client(void);  
 extern void lll_tensor_run(void );  
 // Example main demonstrating flow
 extern "C" void app_main(void) {
@@ -66,7 +71,7 @@ extern "C" void app_main(void) {
     wifi_init_apsta();   
     start_mqtt_client(); 
     // 初始化 SPIFFS
-    
+    xTaskCreate(&periodic_task, "periodic_task", 8192, NULL, 5, NULL);
     // init tflite
     lll_tensor_run();
  

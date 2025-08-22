@@ -4,25 +4,21 @@
 #include <sstream>
 #include <vector>
 #include <fstream>
-#include <stdlib.h> 
-#include "classifier.h"
+#include <stdlib.h>  
 #include "cJSON.h"
 #include "esp_wifi.h"   
 #include <mbedtls/sha1.h>
 #include "classifier_storage.h"
+#include "config_wifi.h"
+
 //#define INFINITY 1000 
 #define DENSE_IN_FEATURES 64
 #define DENSE_OUT_CLASSES 3
 //#define NUM_CLASSES 2
 //#define EMBEDDING_DIM 64
 #define TAG "MQTT"
-#if 1
-    //#define MQTT_BROKER_URI "mqtt://192.168.133.129:1883"
-    #define MQTT_BROKER_URI "mqtt://192.168.68.237:1883"
-#else
-     #define MQTT_BROKER_URI "mqtt://192.168.0.57:1883"
-     
-#endif
+
+
 #define MQTT_USERNAME "tim"
 #define MQTT_PASSWORD "tim"
 #define MQTT_CLIENT_ID_PREFIX "mqttx_" 
@@ -37,7 +33,7 @@
  
 
 std::vector<uint8_t> ewc_buffer;  // 接收 buffer
-
+bool ewc_ready=false;
 // 在 buffer 收到完整檔案後，可寫入 SPIFFS 或直接解析
 // bool save_ewc_to_file(const char* path) {
 //     FILE* f = fopen(path, "wb");
@@ -71,26 +67,31 @@ uint32_t get_client_id()
       unsigned char hash[20]; // SHA-1 produces a 20-byte hash
     mbedtls_sha1(mac, 6, hash);
     uint32_t hashNumber = 0;
-  for(int i=0; i<4; i++) {
-    hashNumber = (hashNumber << 8) | hash[i];
+  for(int i=0; i<6; i++) {
+    hashNumber = (hashNumber << 4) | hash[i];
   }
+  ESP_LOGI(TAG, "hashNumber =%d",(int) hashNumber);
     return hashNumber;
 }
 
 // 将 float 数组格式化为 JSON 并上传
 void publish_feature_vector(int label,int type ) {
     std::stringstream ss;
+    uint32_t  client_id=get_client_id();
+
     //int label=1;
     //int client_id=1;
     if(type==1)
     {
-       ss << "{\"request\":[";     
-            ss << type; 
+       ss << "{\"client_request\":"; 
+       ss << type; 
+       ss << ","; 
+       ss << "\"client_id\":";     
+            ss << client_id ;
 
-        ss << "]}"; 
+        ss << "}";
     }
     else{
-        uint32_t  client_id=get_client_id();
         ss << "{\"fea_weights\":[";
         for (int i = 0; i < DENSE_IN_FEATURES; ++i) {
             ss << f_out[i];
@@ -103,10 +104,10 @@ void publish_feature_vector(int label,int type ) {
 
         ss << "],";
 
-        ss << "\"request\":[";     
+        ss << "\"client_request\":";     
             ss << type; 
 
-        ss << "],";
+        ss << ",";
         
         ss << "\"client_id\":";     
             ss << client_id ;
@@ -238,15 +239,19 @@ void handle_classifier_weight(const float *values, size_t len, const int32_t *sh
  #include "model_pb_handler.h"
  #include "cJSON.h"
 
-  std::vector<std::vector<int>> layer_shapes;
  
-  std::vector<std::vector<int>> parse_layer_shapes(const std::string& json_str) {
+std::vector<std::vector<float>> trainable_layers;
+std::vector<std::vector<float>> fisher_layers;
+std::vector<std::vector<int>> layer_shapes;
+ 
+std::vector<std::vector<int>> parse_layer_shapes(const std::string& json_str)
+{
     std::vector<std::vector<int>> shapes;
 
     cJSON *root = cJSON_Parse(json_str.c_str());
     if (!root) {
         printf("Failed to parse JSON\n");
-        return shapes;   // ✅ 出錯時 return 空
+        return shapes;   
     }
 
     int array_size = cJSON_GetArraySize(root);
@@ -265,9 +270,7 @@ void handle_classifier_weight(const float *values, size_t len, const int32_t *sh
 
     return shapes;   
 }
-
-
-
+ 
 static esp_err_t mqtt_event_handler_cb (esp_mqtt_event_handle_t event) {
     
     switch (event->event_id) {        
@@ -277,70 +280,80 @@ static esp_err_t mqtt_event_handler_cb (esp_mqtt_event_handle_t event) {
             esp_mqtt_client_subscribe(event->client, MQTT_TOPIC_SUB, 1);
             esp_mqtt_client_subscribe(event->client, FISH_SHAP_SUB, 1);
             esp_mqtt_client_subscribe(event->client, WEIGHT_FISH_SUB, 1);
-            publish_feature_vector(0,1);
-            //publish_feature_vector(1);
+            //publish_feature_vector(0,1); 
             break;
         case MQTT_EVENT_DATA:{
-            
-            if (strcmp(event->topic, FISH_SHAP_SUB) == 0) {
+            //ESP_LOGI("MQTT", "Received topic: %.*s", event->topic_len, event->topic);
+            if (event->topic_len == strlen(FISH_SHAP_SUB) &&
+                strncmp(event->topic, FISH_SHAP_SUB, event->topic_len) == 0) {
+                 
+            //if (strcmp(event->topic, FISH_SHAP_SUB) == 0) {
                 std::string json_str(event->data, event->data + event->data_len);
                 layer_shapes = parse_layer_shapes(json_str);
-
-            }
-
-            if(strcmp(event->topic,WEIGHT_FISH_SUB )==0)
-            {
-                ESP_LOGI(TAG, "Received %d bytes on topic: %.*s", event->data_len, event->topic_len, event->topic);
-                ewc_buffer.insert(ewc_buffer.end(), event->data,event->data + event->data_len);
                 break;
             }
-            //printf("MQTT payload received: topic=%.*s\n", event->topic_len, event->topic);
-            //printf("MQTT payload received %d : topic=%s\n", event->topic_len, event->topic);
-            ParsedModelParams params;
-            //ModelParams *msg = (ModelParams*)strndup(event->data, event->data_len);
-            if(decode_model_params( (uint8_t *)event->data, event->data_len, &params)) { 
-                // 处理参数类型
-                switch (params.param_type) {
-                    case ParamType_CLASSIFIER_WEIGHT:
-                        ESP_LOGI(TAG, "Classifier weight received, values: %d", params.value_count);
-                        //handle_classifier_weight(params.values, params.values_count, params.shape, params.shape_count);
-                        update_classifier_weights_bias(params.values, params.value_count,0);
-                        break;
-                    case ParamType_CLASSIFIER_BIAS:
-                        ESP_LOGI(TAG, "Classifier bias received");
-                        //handle_classifier_bias(params.values, params.value_count);
-                        update_classifier_weights_bias(params.values, params.value_count,1);
-                        //type=0;  
-                        break;
-                    case ParamType_ENCODER_WEIGHT:  
-                            ESP_LOGI(TAG, "Fisher weight received");
-                            update_fishermatrix_theta(params.values, params.value_count,0);
-                         
-                        break;
-                    case ParamType_ENCODER_BIAS:
-                        ESP_LOGI(TAG, "Fisher bias received");
-                        update_fishermatrix_theta(params.values, params.value_count,1);                        
-                        //type=1;
-                        break;
-                    default:
-                        ESP_LOGW(TAG, "Unknown or unsupported param_type: %d", params.param_type);
-                        break;
-                } 
+
+            if (event->topic_len == strlen(WEIGHT_FISH_SUB) &&
+                strncmp(event->topic, WEIGHT_FISH_SUB, event->topic_len) == 0) {
+            //if(strstr(event->topic,WEIGHT_FISH_SUB ) )            {
+                 
+                ESP_LOGI("MQTT", "Appending %d bytes to ewc_buffer", event->data_len);
+                ewc_buffer.insert(ewc_buffer.end(), event->data, event->data + event->data_len);
+                ESP_LOGI("MQTT", "ewc_buffer size now: %zu", ewc_buffer.size());
+                if (event->data_len < 999) {
+                    ewc_ready = true;                     
+                    ESP_LOGI("MQTT","Received last chunk, ready to parse");
+                }
+                break;
             }
-            else{
-                //printf("MQTT decode error data_len=%d : data=%s\n", event->data_len, event->data);
-                printf("MQTT decode error data_len=%d \r\n", event->data_len );
+            if (event->topic_len == strlen(MQTT_TOPIC_SUB) &&
+                strncmp(event->topic, MQTT_TOPIC_SUB, event->topic_len) == 0) {
+            //if(strstr(event->topic,MQTT_TOPIC_SUB ) )       {
+                 //printf("MQTT payload received %d : topic=%s\n", event->topic_len, event->topic);
+                ParsedModelParams params;
+                //ModelParams *msg = (ModelParams*)strndup(event->data, event->data_len);
+                if(decode_model_params( (uint8_t *)event->data, event->data_len, &params)) { 
+                    // 处理参数类型
+                    switch (params.param_type) {
+                        case ParamType_CLASSIFIER_WEIGHT:
+                            ESP_LOGI(TAG, "Classifier weight received, values: %d", params.value_count);
+                            //handle_classifier_weight(params.values, params.values_count, params.shape, params.shape_count);
+                            update_classifier_weights_bias(params.values, params.value_count,0);
+                            break;
+                        case ParamType_CLASSIFIER_BIAS:
+                            ESP_LOGI(TAG, "Classifier bias received");
+                            //handle_classifier_bias(params.values, params.value_count);
+                            update_classifier_weights_bias(params.values, params.value_count,1);
+                            
+                            break;
+                        case ParamType_ENCODER_WEIGHT:  
+                                ESP_LOGI(TAG, "Fisher weight received");
+                                update_fishermatrix_theta(params.values, params.value_count,0);
+                            
+                            break;
+                        case ParamType_ENCODER_BIAS:
+                            ESP_LOGI(TAG, "Fisher bias received");
+                            update_fishermatrix_theta(params.values, params.value_count,1);                        
+                            
+                            break;
+                        default:
+                            ESP_LOGW(TAG, "Unknown or unsupported param_type: %d", params.param_type);
+                            break;
+                    } 
+                }
+                else{
+                    //printf("MQTT decode error data_len=%d : data=%s\n", event->data_len, event->data);
+                    printf("MQTT decode error data_len=%d \r\n", event->data_len );
+                }
             }
             break;
         }
         default:
             break;
     }
+    vTaskDelay(1); 
     return ESP_OK;
-}
-#else
-
-
+} 
 
 void handle_mqtt_message(const char *json_str) {
     cJSON *root = cJSON_Parse(json_str);
@@ -380,57 +393,7 @@ void handle_mqtt_message(const char *json_str) {
     return;
 }
 
-
-// ---------------- MQTT 接收 & 指令处理 ----------------
-static esp_err_t mqtt_event_handler_cb(esp_mqtt_event_handle_t event) {
-    switch (event->event_id) {
-    case MQTT_EVENT_CONNECTED:
-        ESP_LOGI(TAG, "MQTT connected");
-        esp_mqtt_client_subscribe(event->client, MQTT_TOPIC_SUB, 1);
-        publish_feature_vector();
-        break;
-
-    case MQTT_EVENT_DATA: {
-        ESP_LOGI(TAG, "Received message on topic: %.*s", event->topic_len, event->topic);
-        ESP_LOGI(TAG, "Message: %.*s", event->data_len, event->data);
-
-        // 创建一个空终止的字符串副本
-        char *msg = strndup(event->data, event->data_len);
-        if (msg != NULL) {
-            // 简单检查是否包含指令字段
-            //if (strstr(msg, "\"capture\"") && strstr(msg, client_id)) {
-            if (strstr(msg, "\"weights\"") ) {
-               handle_mqtt_message( msg ); 
-            }
-            if (strstr(msg, "\"mqttx_\"") ) {
-                ESP_LOGI(TAG, "Parsed command: capture");
-
-                // 模拟响应：发布推理结果
-//#if 1
-                publish_feature_vector();
-// #else
-//                 char json[128];
-//                 snprintf(json, sizeof(json),
-//                         "{\"class\":\"%s\", \"confidence\":%.3f}",
-//                         class_names[0], 0.5);
-//                 esp_mqtt_client_publish(event->client, MQTT_TOPIC_PUB, json, 0, 1, 0);
-// #endif
-                ESP_LOGI(TAG, "Sent capture response");
-            } else {
-                ESP_LOGW(TAG, "Unknown or malformed command.");
-            }
-
-            free(msg);
-        }
-        break;
-    }
-
-
-    default:
-        break;
-    }
-    return ESP_OK;
-}
+ 
 #endif
 
 

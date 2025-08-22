@@ -11,13 +11,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
-#if 0
-  #define WIFI_SSID_STA      "1573"
-  #define WIFI_PASS_STA      "987654321"
-#else
-  #define WIFI_SSID_STA      "JD803"
- #define WIFI_PASS_STA      "18825213948"
-#endif
+#include "config_wifi.h"
 
 
 

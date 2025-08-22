@@ -136,7 +136,7 @@ void set_classifier_from_buffer(const uint8_t* buf, size_t len,size_t type) {
         expected = FisherArenaSize*2;
     if (len <= expected) {
         ESP_LOGE(TAG, "Buffer too small: len=%d expected=%d", (int)len, (int)expected);
-        return; // ⚠️ 绝对不能 memcpy
+        return; //   绝对不能 memcpy
     } 
      if(type==0){
         

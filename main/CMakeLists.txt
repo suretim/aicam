@@ -1,14 +1,14 @@
 
 set(PROTO_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../proto")
-    set(PROTO_PB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../components/nanopb")
-    set(PROTO_SRCS ${PROTO_SRC_DIR}/model.pb.c ) 
-    set(PROTO_HDRS ${PROTO_SRC_DIR}/model.pb.h )
+set(PROTO_PB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../components/nanopb")
+set(PROTO_SRCS ${PROTO_SRC_DIR}/model.pb.c ) 
+set(PROTO_HDRS ${PROTO_SRC_DIR}/model.pb.h )
 if(0) 
       
     idf_component_register(
         PRIV_INCLUDE_DIRS "." ${PROTO_PB_DIR} ${PROTO_SRC_DIR}        
         #for http_web
-        #SRCS  "main_grpc_client.cpp" "http_web.cpp" "img_inference.cc" "config_wifi.cc" "classifier.cc" 
+        #SRCS  "main_grpc_client.cpp" "http_web.cpp" "img_inference.cc" "config_wifi.cc" 
         SRCS  
             "main_grpc_client.cpp" 
             "model_pb_handler.cc" 
