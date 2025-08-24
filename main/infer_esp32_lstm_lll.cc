@@ -106,7 +106,8 @@ void extract_layer_shapes_from_model(const tflite::Model* model) {
                 const tflite::Tensor* w = tensors->Get(weights_idx);
                 if (w && w->shape()) {
                     std::string w_name = w->name() ? w->name()->str() : "unnamed";
-                    if (w_name.find("dense") != std::string::npos) {
+                    if ((w_name.find("meta_dense") != std::string::npos) ||(w_name.find("hvac_dense") != std::string::npos))
+                    {
                         std::vector<int> w_shape;
                         for (int d = 0; d < w->shape()->size(); d++) {
                             w_shape.push_back(w->shape()->Get(d));
@@ -128,7 +129,8 @@ void extract_layer_shapes_from_model(const tflite::Model* model) {
                 const tflite::Tensor* b = tensors->Get(bias_idx);
                 if (b && b->shape()) {
                     std::string b_name = b->name() ? b->name()->str() : "unnamed";
-                    if (b_name.find("dense") != std::string::npos) {
+                    if( (b_name.find("meta_dense") != std::string::npos)  ||(b_name.find("hvac_dense") != std::string::npos)  )
+                    {
                         std::vector<int> b_shape;
                         for (int d = 0; d < b->shape()->size(); d++) {
                             b_shape.push_back(b->shape()->Get(d));

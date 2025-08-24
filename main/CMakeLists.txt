@@ -17,7 +17,7 @@ if(0)
             "config_web.cpp" 
             "config_wifi.cc"
             "config_mqtt.cc" 
-            "classifier.cc"            
+                       
             
             #"cin_web.cc"
             #"video_stream_optimized.cc"

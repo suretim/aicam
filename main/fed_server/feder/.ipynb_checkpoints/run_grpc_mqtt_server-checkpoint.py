@@ -12,8 +12,28 @@ from utils import DataLoader
 
 from utils import DataSaver
 from utils import LeamPipeline
+import tensorflow as tf
+import os
 
+# MQTT配置
+#MQTT_BROKER = "192.168.0.57"
+MQTT_BROKER = "127.0.0.1"
+GRPC_SERVER = "127.0.0.1:50051"
+MQTT_PORT = 1883
+FEDER_PUBLISH = "federated_model/parameters"
+WEIGHT_FISH_PUBLISH = "ewc/weight_fisher"
+FISH_SHAP_PUBLISH = "ewc/layer_shapes"
 
+GRPC_SUBSCRIBE = "grpc_sub/weights"
+
+EWC_ASSETS="ewc_assets"
+
+#define MQTT_TOPIC_PUB "grpc_sub/weights"
+#define MQTT_TOPIC_SUB "federated_model/parameters"
+#define WEIGHT_FISH_SUB "ewc/weight_fisher"
+#define FISH_SHAP_SUB  "ewc/layer_shapes"
+
+client_request_code= 1
 #Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
 #python -m venv .venv
 #.\.venv\Scripts\activate  # Windows PowerShell
@@ -33,6 +53,7 @@ class FederatedLearningServicer(model_pb2_grpc.FederatedLearningServicer):
         self.model_parameters_list = np.empty((0, 64))
         self.model_labels_list = np.empty((0,))
         self.client_id=None
+
     # 用于更新模型的函数
     @classmethod
     def publish_model_to_mqtt(cls,model_parms1,model_parms2,client_id):
@@ -217,6 +238,11 @@ class FederatedLearningServicer(model_pb2_grpc.FederatedLearningServicer):
                 update_timestamp=timestamp)
 
 
+
+#end of FederatedLearningServicer
+
+
+
 def save_fisher_matrix_to_bin(fisher_matrix, bin_file_path):
     # Open the binary file in write mode
     with open(bin_file_path, 'wb') as bin_file:
@@ -256,27 +282,24 @@ def load_ewc_assets(save_dir="../lstm/ewc_assets"):
 
 
 def publish_message():
-    """每分钟发布消息的定时任务"""
-#while True:
-    # 生成带时间戳的消息
-    fisher_matrix = load_ewc_assets()
-    # 转成 bytes
-    message = b''.join([arr.numpy().tobytes() for arr in fisher_matrix])
-     
-    #message=load_ewc_assets(model, save_dir="../lstm/ewc_assets")
-    #message = f"定时消息 @ {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-     
-    # 发布消息
-    result = mqtt_client.publish(MSG_PUBLISH, message, qos=1)
-
-    # 检查发布状态
-    if result.rc == mqtt.MQTT_ERR_SUCCESS:
-        print(f"已发布: {message} → [{MSG_PUBLISH}]")
-    else:
-        print(f"发布失败，错误码: {result.rc}")
-
-    # 等待60秒
-    #time.sleep(60)
+    global client_request_code
+    while True:
+        if client_request_code >=0 :
+            fisher_matrix = load_ewc_assets()
+            message = b''.join([arr.numpy().tobytes() for arr in fisher_matrix])
+            #message=load_ewc_assets(model, save_dir="../lstm/ewc_assets")
+            #message = f"定时消息 @ {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            # 发布消息
+            client_request_code=client_request_code+1
+            result = mqtt_client.publish(WEIGHT_FISH_PUBLISH, message, qos=1)
+            # 检查发布状态
+            if result.rc == mqtt.MQTT_ERR_SUCCESS:
+                #print(f"已发布: {message} → [{WEIGHT_FISH_PUBLISH}]")
+                print(f"已发布:   [{WEIGHT_FISH_PUBLISH}]",client_request_code)
+            else:
+                print(f"发布失败，错误码: {result.rc}")
+        # 等待180秒
+        time.sleep(30)
 
 
 # MQTT 客户端回调函数
@@ -290,39 +313,58 @@ def on_connect(client, userdata, flags, rc):
 
 
 def on_message(client, userdata, msg):
-    print(f"Received MQTT message: {msg.payload.decode()}")
-
+    global client_request_code
     try:
         # 尝试解析 JSON 并提取参数
         #message = parse_message(msg.payload.decode())
         message = json.loads(msg.payload.decode())
+        client_request  = message.get('client_request','0')
+        client_id = message.get('client_id', '1')
+        print(f"Received MQTT message: {msg.payload.decode()}",client_request ,client_request_code,client_id)
 
-        fea_weights = message.get('fea_weights' )
-        fea_labels = message.get('fea_label' )  # Get first element or None
-        client_id =  message.get('client_id', '1')
+        if client_request ==1 :
+            #publish_message()
+            client_request_code = 0
+        else:
+            #client_request_code = 1
+            fea_weights = message.get('fea_weights', [])
+            fea_labels = message.get('fea_labels', [])  # <-- 改成复数
 
-        # 提取特征权重和标签
-        #fea_weights = message['fea_weights']  # 64维特征向量
-        #fea_labels = message['fea_label'][0]  # 单个标签值(1)
-        #fea_vec = fea_labels .extend(fea_weights)
-        fea_vec= fea_labels+fea_weights
-        print(f"Updated model parameters: {fea_vec}")
+            # 确保都是 list
+            if not isinstance(fea_weights, list):
+                fea_weights = [fea_weights]
+            if not isinstance(fea_labels, list):
+                fea_labels = [fea_labels]
 
-        if not isinstance(fea_vec, list):
-            raise ValueError("Invalid format: 'fea_vec' must be a list")
-        load_ewc_assets(model, save_dir=EWC_ASSETS)    
-        #pubish_fisher_matrix(client=client, topic=MSG_PUBLISH, bin_file_path=os.path.join(EWC_ASSETS, "fisher_matrix.bin"))
+            # 拼接 label + features
+            fea_vec = fea_labels + fea_weights
+            print(f"Updated model parameters: {fea_vec}")
 
-        # 建立 gRPC 通信
-        grpc_channel = grpc.insecure_channel(GRPC_SERVER)
-        stub = model_pb2_grpc.FederatedLearningStub(grpc_channel)
+            #fea_weights = message.get('fea_weights' )
+            #fea_labels = message.get('fea_label' )  # Get first element or None
 
-        # 构建 gRPC 请求
-        request = model_pb2.ModelParams(client_id=client_id, values= fea_vec)
+            #fea_vec = message.get('fea_label', []) + message.get('fea_weights', [])
+            # 提取特征权重和标签
+            #fea_weights = message['fea_weights']  # 64维特征向量
+            #fea_labels = message['fea_label'][0]  # 单个标签值(1)
+            #fea_vec = fea_labels .extend(fea_weights)
+            #
 
-        # 调用远程接口
-        response = stub.UploadModelParams(request)
-        print(f"gRPC server response: {response.message}")
+            if not isinstance(fea_vec, list):
+                raise ValueError("Invalid format: 'fea_vec' must be a list")
+            #load_ewc_assets(model, save_dir=EWC_ASSETS)
+            #pubish_fisher_matrix(client=client, topic=MSG_PUBLISH, bin_file_path=os.path.join(EWC_ASSETS, "fisher_matrix.bin"))
+
+            # 建立 gRPC 通信
+            grpc_channel = grpc.insecure_channel(GRPC_SERVER)
+            stub = model_pb2_grpc.FederatedLearningStub(grpc_channel)
+
+            # 构建 gRPC 请求
+            request = model_pb2.ModelParams(client_id=client_id, values= fea_vec)
+
+            # 调用远程接口
+            response = stub.UploadModelParams(request)
+            print(f"gRPC server response: {response.message}")
 
     except json.JSONDecodeError as e:
         print(f"Failed to decode MQTT message as JSON: {e}")
@@ -358,16 +400,6 @@ def serve(data_dir,mqtt_client):
 #python emqx_manager.py
 #netstat -ano | findstr :18083
 
-# MQTT配置
-MQTT_BROKER = "192.168.0.57"
-#MQTT_BROKER = "127.0.0.1"
-GRPC_SERVER = "127.0.0.1:50051"
-MQTT_PORT = 1883
-FEDER_PUBLISH = "federated_model/parameters"
-MSG_PUBLISH = "fisher_model/parameters"  # 替换为你的主题
-#define MQTT_TOPIC_SUB "capture/mqttx_"
-EWC_ASSETS="ewc_assets"
-GRPC_SUBSCRIBE = "grpc_sub/weights"
 if __name__ == '__main__':
 # 启动 gRPC 服务器和 MQTT 客户端
 
@@ -387,16 +419,16 @@ if __name__ == '__main__':
     mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
     data_dir="../../../../data"
     try:
-        publish_message()
+        #
         #from threading import Thread
         #thread = Thread(target=mqtt_subscribe)
         subcribe_thread = threading.Thread(target=mqtt_subscribe)
         subcribe_thread.start()
          
         # 创建定时发布线程
-        #publish_thread = threading.Thread(target=publish_message)
-        #publish_thread.daemon = True  # 设为守护线程
-        #publish_thread.start()
+        publish_thread = threading.Thread(target=publish_message)
+        publish_thread.daemon = True  # 设为守护线程
+        publish_thread.start()
          
         serve(data_dir,mqtt_client)
 

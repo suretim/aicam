@@ -51,9 +51,9 @@ random.seed(42)
 # Index conventions
 CONT_IDX = [0, 1, 2]   # temp, humid, light
 HVAC_IDX = [3, 4, 5, 6]  # ac, heater, dehum, hum
-import tensorflow as tf
+ 
 
-def make_indices(model_path="meta_lstm_classifier.tflite"):
+def make_indices(model_path="meta_lstm_classifier.tflite", header_path="trainable_tensor_indices.h"):
     interpreter = tf.lite.Interpreter(model_path=model_path)
     interpreter.allocate_tensors()
 
@@ -77,53 +77,49 @@ def make_indices(model_path="meta_lstm_classifier.tflite"):
                 print(f"Trainable: {name}, index={idx}, shape={shape}")
                 trainable_indices.append(idx)
 
+    # 生成 C 头文件
+    with open(header_path, "w") as f:
+        f.write("#pragma once\n")
+        f.write(f"const int trainable_tensor_indices[] = {{{', '.join(map(str, trainable_indices))}}};\n")
+        f.write(f"const int trainable_tensor_count = {len(trainable_indices)};\n")
     print("trainable_tensor_indices =", trainable_indices)
     return trainable_indices
-
-def generate_trainable_tensor_indices(model, tflite_model_path, header_path="trainable_tensor_indices.h"):
-    """
-    model: Keras 模型 (已經訓練完成)
-    tflite_model_path: tflite 模型檔案
-    header_path: 輸出 ESP32 header 檔案路徑
-    """
-
-    # 1️⃣ 獲取 Python trainable_variables
+  
+def generate_trainable_tensor_indices0(model, tflite_model_path, header_path="trainable_tensor_indices.h"):
     variable_names = [v.name for v in model.trainable_variables]
     print("Python trainable variables:")
     for i, name in enumerate(variable_names):
         print(i, name)
 
-    # 2️⃣ 解析 TFLite 模型
     interpreter = tf.lite.Interpreter(model_path=tflite_model_path)
     interpreter.allocate_tensors()
     tensor_details = interpreter.get_tensor_details()
 
-    # 3️⃣ 建立 variable_name -> tensor_index 對應
     trainable_tensor_indices = []
+
     for v_name in variable_names:
+        v_name_clean = v_name.split(':')[0]  # 去掉 ":0"
         matched = False
+
+        v_last = v_name_clean.split('/')[-1]  # kernel 或 bias
         for t in tensor_details:
-            t_name = t['name']
-            if v_name.split(':')[0] in t_name:  # 模糊匹配，去掉 ":0"
+            t_last = t['name'].split('/')[-1]
+            if v_last == t_last:
                 trainable_tensor_indices.append(t['index'])
                 matched = True
                 break
+
         if not matched:
-            print(f"Warning: variable {v_name} not found in tflite tensors!")
+            print(f"Warning: variable {v_name_clean} not found in tflite tensors!")
 
     print("trainable_tensor_indices =", trainable_tensor_indices)
 
-    # 4️⃣ 寫入 ESP32 header
+    # 可选：生成 C 头文件
     with open(header_path, "w") as f:
         f.write("#pragma once\n")
-        f.write("#include <vector>\n\n")
-        f.write("static const std::vector<int> trainable_tensor_indices = {")
-        f.write(", ".join(str(idx) for idx in trainable_tensor_indices))
-        f.write("};\n")
-
-    print(f"Header file saved: {header_path}")
-    return trainable_tensor_indices
-
+        f.write(f"const int trainable_tensor_indices[] = {{{', '.join(map(str, trainable_tensor_indices))}}};\n")
+        f.write(f"const int trainable_tensor_count = {len(trainable_tensor_indices)};\n")
+ 
 
 
 def build_csv_data(data_glob):    
@@ -591,7 +587,7 @@ def main(args):
             save_tflite(meta_model, "meta_lstm_classifier.tflite")
             make_indices(model_path="meta_lstm_classifier.tflite")
             #model = tf.keras.models.load_model("your_keras_model.h5")
-            generate_trainable_tensor_indices(meta_model, "meta_lstm_classifier.tflite")
+            #generate_trainable_tensor_indices(meta_model, "meta_lstm_classifier.tflite")
 
             print("meta_lstm_classifier.tflite Done.")
         

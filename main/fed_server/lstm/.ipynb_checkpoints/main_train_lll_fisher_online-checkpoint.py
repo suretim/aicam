@@ -40,8 +40,8 @@ REPLAY_CAPACITY = 1000
 REPLAY_WEIGHT = 0.3
 LAMBDA_EWC = 1e-3
 NUM_FEATS=7
-#ENCODER_MODE ="finetune"  
-ENCODER_MODE ="last_n"  
+#ENCODER_MODE = finetune  freeze last_n
+ENCODER_MODE ="freeze"
 LAST_N= 1
 FLOWERING_WEIGHT = 2.0  # gradient boost upper bound for flowering-focus
 
@@ -51,8 +51,77 @@ random.seed(42)
 # Index conventions
 CONT_IDX = [0, 1, 2]   # temp, humid, light
 HVAC_IDX = [3, 4, 5, 6]  # ac, heater, dehum, hum
-
  
+
+def make_indices(model_path="meta_lstm_classifier.tflite", header_path="trainable_tensor_indices.h"):
+    interpreter = tf.lite.Interpreter(model_path=model_path)
+    interpreter.allocate_tensors()
+
+    tensor_details = interpreter.get_tensor_details()
+
+    trainable_indices = []
+
+    for t in tensor_details:
+        name = t['name']
+        idx  = t['index']
+        shape = t['shape']
+
+        # 僅選 Dense 層或 hvac_dense 的 kernel/bias
+        if ("meta_dense" in name or "hvac_dense" in name):
+            # 過濾掉 fused/activation tensor
+            if "Relu" in name or ";" in name:
+                continue
+
+            # bias 一般是 1D，kernel 一般是 2D
+            if len(shape) == 1 or len(shape) == 2:
+                print(f"Trainable: {name}, index={idx}, shape={shape}")
+                trainable_indices.append(idx)
+
+    # 生成 C 头文件
+    with open(header_path, "w") as f:
+        f.write("#pragma once\n")
+        f.write(f"const int trainable_tensor_indices[] = {{{', '.join(map(str, trainable_indices))}}};\n")
+        f.write(f"const int trainable_tensor_count = {len(trainable_indices)};\n")
+    print("trainable_tensor_indices =", trainable_indices)
+    return trainable_indices
+  
+def generate_trainable_tensor_indices0(model, tflite_model_path, header_path="trainable_tensor_indices.h"):
+    variable_names = [v.name for v in model.trainable_variables]
+    print("Python trainable variables:")
+    for i, name in enumerate(variable_names):
+        print(i, name)
+
+    interpreter = tf.lite.Interpreter(model_path=tflite_model_path)
+    interpreter.allocate_tensors()
+    tensor_details = interpreter.get_tensor_details()
+
+    trainable_tensor_indices = []
+
+    for v_name in variable_names:
+        v_name_clean = v_name.split(':')[0]  # 去掉 ":0"
+        matched = False
+
+        v_last = v_name_clean.split('/')[-1]  # kernel 或 bias
+        for t in tensor_details:
+            t_last = t['name'].split('/')[-1]
+            if v_last == t_last:
+                trainable_tensor_indices.append(t['index'])
+                matched = True
+                break
+
+        if not matched:
+            print(f"Warning: variable {v_name_clean} not found in tflite tensors!")
+
+    print("trainable_tensor_indices =", trainable_tensor_indices)
+
+    # 可选：生成 C 头文件
+    with open(header_path, "w") as f:
+        f.write("#pragma once\n")
+        f.write(f"const int trainable_tensor_indices[] = {{{', '.join(map(str, trainable_tensor_indices))}}};\n")
+        f.write(f"const int trainable_tensor_count = {len(trainable_tensor_indices)};\n")
+ 
+
+
 def build_csv_data(data_glob):    
     
     # =============================
@@ -243,7 +312,7 @@ def outer_update_with_lll(memory,meta_model, meta_optimizer, tasks,
         orig_vars = [tf.identity(v) for v in meta_model.trainable_variables]
 
         # inner update
-        updated_vars = inner_update(meta_model, X_support, y_support)
+        updated_vars = inner_update(meta_model, X_support, y_support,lr_inner=lr_inner,)
         for var, upd in zip(meta_model.trainable_variables, updated_vars):
             var.assign(upd)
 
@@ -262,6 +331,7 @@ def outer_update_with_lll(memory,meta_model, meta_optimizer, tasks,
             # EWC (using Fisher matrix)
             if prev_weights is not None and fisher_matrix is not None:
                 ewc_loss = 0.0
+
                 for w, pw, f in zip(meta_model.trainable_variables, prev_weights, fisher_matrix):
                     ewc_loss += tf.reduce_sum(f * tf.square(w - pw))
                 loss_total += lambda_ewc * ewc_loss
@@ -326,7 +396,7 @@ def save_fisher_and_weights(model, fisher_matrix, save_dir="ewc_assets"):
     
     # 將 layer_shapes 轉成 JSON bytes
     layer_shapes_json = json.dumps(layer_shapes)
-    # 寫入檔案
+    # 寫入檔案 [[8, 16], [16], [80, 64], [64], [64, 32], [32]]
     with open(os.path.join(save_dir,"layer_shapes.json") , "w") as f:
         f.write(layer_shapes_json)
     
@@ -381,7 +451,7 @@ def save_tflite(model, out_path):
         f.write(tflite_model)
     print("Saved TFLite:", out_path)
     
-def set_trainable_layers(encoder, meta_model, encoder_mode="finetune", last_n=None):
+def set_trainable_layers(encoder, meta_model, encoder_mode="finetune", last_n=1):
     """
     設定 encoder 與 meta_model 層的 trainable 狀態
 
@@ -406,11 +476,13 @@ def set_trainable_layers(encoder, meta_model, encoder_mode="finetune", last_n=No
     # 假設 meta_model 的 Dense 層都可以單獨 trainable
     for layer in meta_model.layers:
         # 如果是 encoder 的子模型，不改變（由 encoder 管理）
-        if layer.name.startswith("lstm_encoder") or layer.name.startswith("encoder_"):
-            continue
+        #if layer.name.startswith("lstm_encoder") or layer.name.startswith("encoder_"):
+        #    continue
         # 其他層全部可訓練
-        layer.trainable = True
-
+        if layer.name.startswith("meta_dense") or layer.name.startswith("hvac_dense"):
+            layer.trainable = True
+        else:
+            layer.trainable = False
     print(f"✅ Encoder mode: {encoder_mode}, last_n={last_n if encoder_mode=='last_n' else 'N/A'}")
 
     # 列印實際 trainable 層（只列出有權重的）
@@ -495,7 +567,7 @@ def main(args):
                 tasks = sample_tasks(X_labeled, y_labeled)
                 loss, acc, prev_weights = outer_update_with_lll(memory=memory,
                     meta_model=meta_model, meta_optimizer=meta_optimizer, tasks=tasks, 
-                    prev_weights=prev_weights, fisher_matrix=fisher_matrix
+                    lr_inner=INNER_LR,prev_weights=prev_weights, fisher_matrix=fisher_matrix
                 )
                 meta_loss_history.append(loss)
                 meta_acc_history.append(acc)
@@ -513,8 +585,11 @@ def main(args):
         save_tflite(lstm_encoder, "lstm_encoder_contrastive.tflite")
         if X_labeled.size > 0:
             save_tflite(meta_model, "meta_lstm_classifier.tflite")
-        
-        print("Done.") 
+            make_indices(model_path="meta_lstm_classifier.tflite")
+            #model = tf.keras.models.load_model("your_keras_model.h5")
+            #generate_trainable_tensor_indices(meta_model, "meta_lstm_classifier.tflite")
+
+            print("meta_lstm_classifier.tflite Done.")
         
         # ============ 測試跑一次前向 ============
          
@@ -526,6 +601,7 @@ def main(args):
     
     except KeyboardInterrupt:
         print("Skip meta-learning: no labeled data.")
+
 
 
 if __name__ == "__main__":

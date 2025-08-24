@@ -259,8 +259,9 @@ class LeamPipeline:
 
     def get_federated_dataset(self, devices=None, samples_per_device=None):
         """創建聯邦學習數據集"""
-        federated_data = []
-
+        #federated_data = []
+        features=[]
+        labels=[]
         for device_id in devices:
             features, labels = DataLoader.load_data(
                 self.data_loader,
@@ -277,9 +278,9 @@ class LeamPipeline:
                 features = features[indices]
                 labels = labels[indices]
 
-            federated_data.append((features, labels))
+            #federated_data.append((features, labels))
 
-        return federated_data
+        return features, labels
 
     def get_centralized_dataset(self, devices=None, test_size=0.2):
         """創建集中式訓練數據集"""
@@ -352,7 +353,7 @@ class LeamPipeline:
                 # 例如: 訓練模型、計算統計量等
                 mean_features = np.mean(batch_features, axis=0)
                 print(f"本批次特徵均值: {mean_features[:5]}...")  # 顯示前5維
-
+        return mean_features
 
 
 

@@ -49,7 +49,7 @@ static const char *TAG = "MAIN_LLL";
 void periodic_task(void *pvParameter) {
     while (1) {
         publish_feature_vector(0,1);
-        vTaskDelay(pdMS_TO_TICKS(10000)); // 延遲 60 秒
+        vTaskDelay(pdMS_TO_TICKS(60000)); // 延遲 60 秒
     }
 }
 //extern void start_mqtt_client(void);  
