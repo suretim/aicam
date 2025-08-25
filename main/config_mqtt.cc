@@ -12,12 +12,9 @@
 #include "config_wifi.h"
 
  #include "model_pb_handler.h"
-
-//#define INFINITY 1000 
-#define DENSE_IN_FEATURES 64
-#define DENSE_OUT_CLASSES 3
-//#define NUM_CLASSES 2
-//#define EMBEDDING_DIM 64
+ 
+//#define DENSE_IN_FEATURES 64
+//#define DENSE_OUT_CLASSES 3 
 #define TAG "MQTT"
 
 
@@ -30,20 +27,11 @@
 #define WEIGHT_FISH_SUB "ewc/weight_fisher"
 #define FISH_SHAP_SUB  "ewc/layer_shapes"
 
-#define MQTT_KEEPALIVE_SECONDS 120
- 
- 
+#define MQTT_KEEPALIVE_SECONDS 120 
 
 std::vector<uint8_t> ewc_buffer;  // 接收 buffer
 bool ewc_ready=false;
-// 在 buffer 收到完整檔案後，可寫入 SPIFFS 或直接解析
-// bool save_ewc_to_file(const char* path) {
-//     FILE* f = fopen(path, "wb");
-//     if (!f) return false;
-//     fwrite(ewc_buffer.data(), 1, ewc_buffer.size(), f);
-//     fclose(f);
-//     return true;
-// }
+
 
 
 static esp_mqtt_client_handle_t mqtt_client = NULL; 
@@ -237,7 +225,7 @@ void handle_classifier_weight(const float *values, size_t len, const int32_t *sh
  
 #endif
 
-#if 1
+ 
  
 std::vector<std::vector<float>> trainable_layers;
 std::vector<std::vector<float>> fisher_layers;
@@ -279,81 +267,7 @@ static int expected_total = 0;
 static uint8_t *g_big_buffer = NULL;
 static size_t g_received_len = 0;
 static int g_total_chunks = -1;
-#if 0
-void xxx (void)
 
-{
-
-    ESP_LOGI(TAG, "MQTT 收到消息: %.*s", event->data_len, event->data);
-
-                // 解析 JSON
-                cJSON *root = cJSON_ParseWithLength(event->data, event->data_len);
-                if (!root) {
-                    ESP_LOGE(TAG, "JSON parse failed");
-                    return ESP_FAIL;
-                }
-
-                cJSON *seq_id = cJSON_GetObjectItem(root, "seq_id");
-                cJSON *total  = cJSON_GetObjectItem(root, "total");
-                cJSON *data   = cJSON_GetObjectItem(root, "data");
-
-                if (cJSON_IsNumber(seq_id) && cJSON_IsNumber(total) && cJSON_IsString(data)) {
-                    if (expected_total == 0) {
-                        expected_total = total->valueint;
-                        recv_chunks.resize(expected_total);
-                        ESP_LOGI(TAG, "准备接收 %d 个分片", expected_total);
-                    }
-
-                    int idx = seq_id->valueint;
-                    if (idx < expected_total) {
-                        recv_chunks[idx] = std::string(data->valuestring);
-                        ESP_LOGI(TAG, "分片 %d/%d 接收完成", idx+1, expected_total);
-                    }
-                }
-                cJSON_Delete(root);
-
-                // 检查是否收齐
-                bool complete = true;
-                for (int i = 0; i < expected_total; i++) {
-                    if (recv_chunks[i].empty()) {
-                        complete = false;
-                        break;
-                    }
-                }
-
-                if (complete) {
-                    ESP_LOGI(TAG, "所有分片接收完成，开始拼接");
-
-                    // 拼接 HEX 字符串并转回二进制
-                    //std::vector<uint8_t> full_buffer;
-                    for (auto &chunk : recv_chunks) {
-                        for (size_t i = 0; i < chunk.size(); i += 2) {
-                            std::string byte_str = chunk.substr(i, 2);
-                            uint8_t byte = (uint8_t) strtol(byte_str.c_str(), NULL, 16);
-                            ewc_buffer.push_back(byte);
-                        }
-                    }
-
-                    ESP_LOGI(TAG, "完整 Fisher buffer 长度=%d", ewc_buffer.size());
-
-                    // TODO: 这里可以把 buffer 转成 float* 然后传给模型
-                    //   float *fisher_data = reinterpret_cast<float*>(full_buffer.data());
-                    //   int fisher_len = full_buffer.size() / sizeof(float);
-                    // ESP_LOGI("MQTT", "Appending %d bytes to ewc_buffer", event->data_len);
-                    // ewc_buffer.insert(ewc_buffer.end(), event->data, event->data + event->data_len);
-                    //  ESP_LOGI("MQTT", "ewc_buffer size now: %zu", ewc_buffer.size());
-                    //if (event->data_len < 999) {
-                        ewc_ready = true;                     
-                    //    ESP_LOGI("MQTT","Received last chunk, ready to parse");
-                    //}
-                    //ESP_LOGI(TAG, "Fisher matrix float 长度=%d", fisher_len);
-
-                    // 清空状态，准备下一次
-                    recv_chunks.clear();
-                    expected_total = 0;
-                }
-}
-#endif
 
 // 將 hex 字串轉成 bytes
 static size_t hex_to_bytes(const char *hex_str, uint8_t *out_buf, size_t out_buf_size) {
@@ -443,9 +357,7 @@ static esp_err_t mqtt_event_handler_cb (esp_mqtt_event_handle_t event) {
             //publish_feature_vector(0,1); 
             break;
         case MQTT_EVENT_DATA:{
-            #if 1
-
-
+             
 
             if (event->topic_len == strlen(WEIGHT_FISH_SUB) &&
                 strncmp(event->topic, WEIGHT_FISH_SUB, event->topic_len) == 0)
@@ -458,22 +370,7 @@ static esp_err_t mqtt_event_handler_cb (esp_mqtt_event_handle_t event) {
                 break;
             }
 
-            #else
-
-            if (event->topic_len == strlen(WEIGHT_FISH_SUB) &&
-                strncmp(event->topic, WEIGHT_FISH_SUB, event->topic_len) == 0) {
-                 
-                ESP_LOGI("MQTT", "Appending %d bytes to ewc_buffer", event->data_len);
-                ewc_buffer.insert(ewc_buffer.end(), event->data, event->data + event->data_len);
-                ESP_LOGI("MQTT", "ewc_buffer size now: %zu", ewc_buffer.size());
-                if (event->data_len < 999) {
-                    ewc_ready = true;                     
-                    ESP_LOGI("MQTT","Received last chunk, ready to parse");
-                }
-                break;
-            }
-
-           #endif
+             
             //ESP_LOGI("MQTT", "Received topic: %.*s", event->topic_len, event->topic);
             if (event->topic_len == strlen(FISH_SHAP_SUB) &&
                 strncmp(event->topic, FISH_SHAP_SUB, event->topic_len) == 0) {
@@ -484,8 +381,7 @@ static esp_err_t mqtt_event_handler_cb (esp_mqtt_event_handle_t event) {
 
             if (event->topic_len == strlen(MQTT_TOPIC_SUB) &&
                 strncmp(event->topic, MQTT_TOPIC_SUB, event->topic_len) == 0) {
-            //if(strstr(event->topic,MQTT_TOPIC_SUB ) )       {
-                 //printf("MQTT payload received %d : topic=%s\n", event->topic_len, event->topic);
+             
                 ParsedModelParams params;
                 //ModelParams *msg = (ModelParams*)strndup(event->data, event->data_len);
                 if(decode_model_params( (uint8_t *)event->data, event->data_len, &params)) { 
@@ -569,8 +465,7 @@ void handle_mqtt_message(const char *json_str) {
     return;
 }
 
- 
-#endif
+  
 
 
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
@@ -608,9 +503,7 @@ void start_mqtt_client (void) {
         },
         .network = {
             .reconnect_timeout_ms = 10000
-        } 
-      //  .buffer_size = 8192,      // 收消息緩衝區
-    //.out_buffer_size = 8192   // 發消息緩衝區
+        }  
     };
  
     mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
