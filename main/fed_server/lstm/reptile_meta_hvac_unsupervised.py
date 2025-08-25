@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-\"\"\"Reptile-style self-supervised meta-learning on HVAC plant time series.
-Usage:
- - Put your CSV files (temp,humid,light,ac,heater,dehum,hum) into ./lll_data
- - Run this script. It will train an encoder+predictor with Reptile meta-update.
- - The task is next-step prediction (self-supervised).
-\"\"\"
 
 import os
 import glob

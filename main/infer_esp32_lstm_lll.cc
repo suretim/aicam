@@ -410,6 +410,15 @@ void parse_ewc_assets() {
 
     // 用完清空 buffer
     ewc_buffer.clear();
+    
+    if (!trainable_layers.empty()) { 
+        update_dense_layer_weights();
+        
+
+        trainable_layers.clear();  // 可選，保留 capacity
+        fisher_layers.clear();
+        ESP_LOGI("Main", "All layers updated");
+    }
     ewc_ready = false;
 }
 
@@ -483,14 +492,6 @@ TfLiteStatus run_inference(float* input_seq, int seq_len, int num_feats, float* 
     // 微调示意：更新权重，EWC参与 
     parse_ewc_assets();   
 
-    if (!trainable_layers.empty()) { 
-        update_dense_layer_weights();
-        
-
-        trainable_layers.clear();  // 可選，保留 capacity
-        fisher_layers.clear();
-        ESP_LOGI("Main", "All layers updated");
-    }
 
      
     printf("input dims: %d %d %d %d  output dims: %d %d  \n",

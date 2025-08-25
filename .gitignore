@@ -1,4 +1,5 @@
 # Ignore generated model files
+dependencies.lock
 variables.data-00000-of-00001
 variables.data*
 *.npy

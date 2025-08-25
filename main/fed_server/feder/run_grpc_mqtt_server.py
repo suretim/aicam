@@ -267,7 +267,7 @@ MQTT_PORT = 1883
 MQTT_BROKER = "127.0.0.1"
 
 def main(args):
-    global MQTT_BROKER,MQTT_PORT, EWC_ASSETS
+    global MQTT_BROKER,MQTT_PORT, EWC_ASSETS,DATA_DIR
     MQTT_BROKER = args.mqtt_broker
     MQTT_PORT=args.mqtt_port
     DATA_DIR=args.data_dir
